@@ -3,28 +3,48 @@ import assert from "node:assert/strict";
 import { MATCHUP_REFERENCE } from "../js/presets/matchup-reference.js";
 import { SSBU_FIGHTERS } from "../js/presets/ssbu.js";
 
-test("MATCHUP_REFERENCE: ネスのgood/badキャラ名はfighters.js(SSBU_FIGHTERS)に実在する", () => {
-  const fighterSet = new Set(SSBU_FIGHTERS);
-  const ref = MATCHUP_REFERENCE["ネス"];
-  assert.ok(ref, "ネスのデータが存在する");
-  for (const item of [...ref.good, ...ref.bad]) {
-    assert.ok(fighterSet.has(item.name), `${item.name} はSSBU_FIGHTERSに存在するべき`);
-    assert.ok(typeof item.note === "string" && item.note.length > 0, `${item.name} にnoteがあるべき`);
+const fighterSet = new Set(SSBU_FIGHTERS);
+
+test("MATCHUP_REFERENCE: 収録キーはすべてSSBU_FIGHTERSに存在し、全86体を網羅する", () => {
+  assert.deepEqual(Object.keys(MATCHUP_REFERENCE).sort(), [...SSBU_FIGHTERS].sort());
+});
+
+test("MATCHUP_REFERENCE: 全キャラのgood/badに1〜6件の実在する相手と統計勝率帯がある", () => {
+  for (const [my, ref] of Object.entries(MATCHUP_REFERENCE)) {
+    assert.ok(fighterSet.has(my), my);
+    for (const kind of ["good", "bad"]) {
+      assert.ok(Array.isArray(ref[kind]) && ref[kind].length >= 1 && ref[kind].length <= 6, `${my}: ${kind}`);
+      for (const item of ref[kind]) {
+        assert.ok(fighterSet.has(item.name), `${my}: ${item.name}`);
+        assert.notEqual(item.name, my, `${my}: 自分自身を含まない`);
+        assert.match(item.note, /^(?:有利|微有利|不利|微不利|五分)（スマメイト統計・第\d+期/);
+        assert.ok(item.note.length <= 500, `${my}: noteの長さ`);
+        assert.ok(!item.note.includes("n="), "非公開の対戦数を作らない");
+      }
+    }
   }
 });
 
-test("MATCHUP_REFERENCE: good/badに重複キャラがない", () => {
-  const ref = MATCHUP_REFERENCE["ネス"];
-  const goodNames = new Set(ref.good.map((x) => x.name));
-  for (const b of ref.bad) {
-    assert.ok(!goodNames.has(b.name), `${b.name} がgoodとbad両方に入っている`);
+test("MATCHUP_REFERENCE: 各キャラのgood/badの内部・両方に重複する相手がいない", () => {
+  for (const [my, ref] of Object.entries(MATCHUP_REFERENCE)) {
+    const names = [...ref.good, ...ref.bad].map((item) => item.name);
+    assert.equal(new Set(names).size, names.length, my);
   }
 });
 
-test("MATCHUP_REFERENCE: sourcesはhttpsのURL配列", () => {
-  const ref = MATCHUP_REFERENCE["ネス"];
-  assert.ok(Array.isArray(ref.sources) && ref.sources.length >= 1);
-  for (const url of ref.sources) {
-    assert.match(url, /^https:\/\//);
+test("MATCHUP_REFERENCE: 全キャラのsourcesはhttpsのURL配列", () => {
+  for (const [my, ref] of Object.entries(MATCHUP_REFERENCE)) {
+    assert.ok(Array.isArray(ref.sources) && ref.sources.length >= 1, my);
+    for (const source of ref.sources) assert.equal(new URL(source).protocol, "https:", my);
+  }
+});
+
+test("MATCHUP_REFERENCE: 合算5組は同じ出典を持ち、合算対象を表示する", () => {
+  for (const [a, b] of [["サムス", "ダークサムス"], ["ピーチ", "デイジー"], ["マルス", "ルキナ"], ["ピット", "ブラックピット"], ["シモン", "リヒター"]]) {
+    assert.deepEqual(MATCHUP_REFERENCE[a], MATCHUP_REFERENCE[b]);
+    for (const item of [...MATCHUP_REFERENCE[a].good, ...MATCHUP_REFERENCE[a].bad]) {
+      assert.ok(item.note.includes(`自キャラ: ${a}／${b}合算`));
+      assert.ok(![a, b].includes(item.name));
+    }
   }
 });

@@ -424,9 +424,8 @@ function renderMatchItem(m) {
   ]);
 }
 
-// ---------- 相性の目安(コミュニティの一般的な相性評価。対戦ログが無くても出す) ----------
+// ---------- 相性の目安(スマメイトの統計。対戦ログが無くても出す) ----------
 function referenceDataFor(my) {
-  // 今回はネスのみ収録(js/presets/matchup-reference.js)。他キャラは未収録。
   return MATCHUP_REFERENCE[my] || null;
 }
 
@@ -460,7 +459,7 @@ function renderReferenceCard(my, myMatches) {
     el(
       "p",
       { className: "hint" },
-      "コミュニティの評価の目安です。腕前で変わります。あなた自身の対戦ログがあれば横に表示します。"
+      "スマメイト(オンライン対戦)の統計に基づく目安です。腕前で変わります。あなた自身の対戦ログがあれば横に表示します。"
     ),
     el("div", { className: "ref-matchup-columns" }, [
       renderReferenceColumn("得意な相手", "good", ref.good, myFighterStats),
