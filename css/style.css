@@ -453,3 +453,60 @@ input[type="search"] {
   color: var(--accent);
   font-weight: bold;
 }
+
+.ref-matchup-columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin: 8px 0;
+}
+
+@media (max-width: 380px) {
+  .ref-matchup-columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ref-matchup-col h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+}
+
+.ref-matchup-col.good h3 { color: var(--win); }
+.ref-matchup-col.bad h3 { color: var(--lose); }
+
+.ref-matchup-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 8px;
+  margin-bottom: 6px;
+}
+
+.ref-matchup-name {
+  font-weight: bold;
+  display: block;
+}
+
+.ref-matchup-note {
+  font-size: 13px;
+  color: var(--muted);
+  display: block;
+  margin-top: 2px;
+}
+
+.ref-matchup-mine {
+  font-size: 12px;
+  color: var(--fg);
+  display: block;
+  margin-top: 4px;
+}
+
+.ref-matchup-sources {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+
+.ref-matchup-sources a {
+  color: var(--muted);
+}

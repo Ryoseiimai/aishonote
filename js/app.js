@@ -1,5 +1,6 @@
 import { SSBU_DRILLS } from "./presets/ssbu-drills.js";
 import { GENERIC_DRILLS } from "./drills-generic.js";
+import { MATCHUP_REFERENCE } from "./presets/matchup-reference.js";
 import {
   LOSS_TAGS,
   loadState,
@@ -202,6 +203,18 @@ function renderHome() {
         ),
   ]);
 
+  const refData = referenceDataFor(my);
+  const refNoteSection = refData
+    ? el("div", { className: "card" }, [
+        el("h2", {}, "一般的な相性の目安"),
+        el(
+          "p",
+          { className: "hint" },
+          `${my}は得意${refData.good.length}キャラ・苦手${refData.bad.length}キャラの目安データがあります。「相性」タブで詳しく見られます。`
+        ),
+      ])
+    : null;
+
   const recent10 = recentWinRate(myMatches, 10);
   const overall = winRate(myMatches);
   const streak = currentStreak(myMatches);
@@ -223,7 +236,7 @@ function renderHome() {
     renderWeeklyGraph(weekly),
   ]);
 
-  return el("section", { className: "panel" }, [homeworkSection, weakSection, summarySection, graphSection]);
+  return el("section", { className: "panel" }, [homeworkSection, weakSection, refNoteSection, summarySection, graphSection]);
 }
 
 function summaryBox(label, value) {
@@ -411,6 +424,62 @@ function renderMatchItem(m) {
   ]);
 }
 
+// ---------- 相性の目安(コミュニティの一般的な相性評価。対戦ログが無くても出す) ----------
+function referenceDataFor(my) {
+  // 今回はネスのみ収録(js/presets/matchup-reference.js)。他キャラは未収録。
+  return MATCHUP_REFERENCE[my] || null;
+}
+
+function myStatsText(myFighterStats, opponentName) {
+  const stats = myFighterStats.find((s) => s.opponent === opponentName);
+  if (!stats || stats.total === 0) return null;
+  if (stats.provisional) return `あなたは${stats.total}戦・様子見`;
+  return `あなたは ${stats.wins}勝${stats.total - stats.wins}敗（勝率${Math.round(stats.rate * 100)}%）`;
+}
+
+function renderReferenceColumn(title, className, list, myFighterStats) {
+  return el("div", { className: `ref-matchup-col ${className}` }, [
+    el("h3", {}, title),
+    ...list.map((item) => {
+      const mine = myStatsText(myFighterStats, item.name);
+      return el("div", { className: "ref-matchup-item" }, [
+        el("span", { className: "ref-matchup-name" }, item.name),
+        el("span", { className: "ref-matchup-note" }, item.note),
+        mine ? el("span", { className: "ref-matchup-mine" }, mine) : null,
+      ]);
+    }),
+  ]);
+}
+
+function renderReferenceCard(my, myMatches) {
+  const ref = referenceDataFor(my);
+  if (!ref) return null;
+  const myFighterStats = matchupStats(myMatches, my);
+  return el("div", { className: "card" }, [
+    el("h2", {}, "一般的な相性の目安"),
+    el(
+      "p",
+      { className: "hint" },
+      "コミュニティの評価の目安です。腕前で変わります。あなた自身の対戦ログがあれば横に表示します。"
+    ),
+    el("div", { className: "ref-matchup-columns" }, [
+      renderReferenceColumn("得意な相手", "good", ref.good, myFighterStats),
+      renderReferenceColumn("苦手な相手", "bad", ref.bad, myFighterStats),
+    ]),
+    el(
+      "p",
+      { className: "ref-matchup-sources" },
+      [
+        "出典: ",
+        ...ref.sources.flatMap((url, i) => [
+          i > 0 ? "、" : null,
+          el("a", { href: url, target: "_blank", rel: "noopener noreferrer" }, url),
+        ]),
+      ].filter((x) => x !== null)
+    ),
+  ]);
+}
+
 // ---------- 相性 ----------
 function renderMatchup() {
   const gameId = state.activeGameId;
@@ -420,6 +489,7 @@ function renderMatchup() {
   }
   const fighters = fightersOf(state.games[gameId]);
   const myMatches = state.matches.filter((m) => m.gameId === gameId && m.my === my);
+  const referenceCard = renderReferenceCard(my, myMatches);
   const computed = matchupStats(myMatches, my);
   const computedMap = new Map(computed.map((c) => [c.opponent, c]));
 
@@ -472,6 +542,7 @@ function renderMatchup() {
   const editor = matchupSelected ? renderMatchupEditor(gameId, my, matchupSelected) : null;
 
   return el("section", { className: "panel" }, [
+    referenceCard,
     el("div", { className: "card" }, [el("h2", {}, `相性表（${my}）`), el("p", { className: "hint" }, "苦手順に並んでいます。タップすると印とメモを編集できます。"), list]),
     editor,
   ]);
