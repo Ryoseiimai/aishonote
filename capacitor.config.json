@@ -1,0 +1,23 @@
+{
+  "appId": "jp.co.ryoseiworld.aishonote",
+  "appName": "相性ノート",
+  "webDir": "www",
+  "ios": {
+    "backgroundColor": "#111111",
+    "preferredContentMode": "mobile",
+    "contentInset": "automatic"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 0,
+      "launchAutoHide": true,
+      "backgroundColor": "#111111",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "overlaysWebView": true,
+      "style": "LIGHT",
+      "backgroundColor": "#111111"
+    }
+  }
+}

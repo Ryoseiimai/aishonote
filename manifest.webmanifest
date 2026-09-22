@@ -1,0 +1,21 @@
+{
+  "name": "相性ノート",
+  "short_name": "相性ノート",
+  "description": "対戦ログと相性を記録し、練習メニューを自動提示するツール。大乱闘スマッシュブラザーズ SPECIAL向けのプリセットを同梱（任天堂非公式のファン製ツール）。",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#D7263D",
+  "lang": "ja",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

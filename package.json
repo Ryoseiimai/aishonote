@@ -1,0 +1,14 @@
+{
+  "name": "aishonote",
+  "private": true,
+  "type": "module",
+  "description": "相性ノート。対戦ログと相性を記録して練習メニューを自動提示するツール。ビルド不要の素のHTML/CSS/ES Modules。",
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "@capacitor/cli": "^8.5.1",
+    "@capacitor/core": "^8.5.1",
+    "@capacitor/ios": "^8.5.1"
+  }
+}
