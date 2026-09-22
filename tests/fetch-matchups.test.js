@@ -9,6 +9,9 @@ import {
   createFetcher,
   collectReferences,
   REQUEST_INTERVAL_MS,
+  jstDate,
+  renderReferenceModule,
+  renderLinksModule,
 } from "../scripts/fetch-matchups.mjs";
 
 // 出典HTMLの構造だけを再現。実データのダウンロードなしで抽出の境界を検証する。
@@ -108,7 +111,7 @@ test("fetch-matchups: HTTP失敗はページ内容として扱わない", async 
 test("fetch-matchups: 一部失敗でも直列取得を続け、取得分と欠落一覧を返す", async () => {
   const requests = [];
   let inFlight = false;
-  const { references, failures } = await collectReferences(async (url) => {
+  const { references, failures, period } = await collectReferences(async (url) => {
     assert.equal(inFlight, false, "並列アクセスしない");
     inFlight = true;
     requests.push(url);
@@ -120,6 +123,28 @@ test("fetch-matchups: 一部失敗でも直列取得を続け、取得分と欠�
   }, () => {});
   assert.equal(requests.length, 3);
   assert.deepEqual(Object.keys(references), ["ネス"]);
+  assert.equal(period, 21);
   assert.equal(failures.flatMap((failure) => failure.names).length, 85);
   assert.ok(failures.some((failure) => failure.names.includes("マリオ") && failure.reason === "HTTP 503"));
+});
+
+test("fetch-matchups: 取得日は日本時間の日付（UTCの前日にならない）", () => {
+  assert.equal(jstDate(new Date("2026-09-22T19:40:00Z")), "2026-09-23");
+  assert.equal(jstDate(new Date("2026-09-23T14:59:00Z")), "2026-09-23");
+  assert.equal(jstDate(new Date("2026-09-23T15:00:00Z")), "2026-09-24");
+});
+
+test("fetch-matchups: 同梱データにはメタ（期・取得日）を、リンク用ファイルにはURLだけを書き出す", async () => {
+  const parsed = parseMatchupPage(page(section(21, basicGroups)));
+  const references = { ネス: makeReference("ネス", "ness", parsed) };
+  const meta = { period: 21, fetchedAt: "2026-09-23" };
+  const encode = (text) => `data:text/javascript;base64,${Buffer.from(text).toString("base64")}`;
+  const refModule = renderReferenceModule(references, meta);
+  assert.ok(refModule.split("\n")[1].includes("第21期・取得日: 2026-09-23"));
+  const loaded = await import(encode(refModule));
+  assert.deepEqual(loaded.MATCHUP_REFERENCE_META, meta);
+  assert.deepEqual(loaded.MATCHUP_REFERENCE, references);
+  const linksModule = renderLinksModule(references);
+  assert.ok(!/"good"|"bad"|"note"/.test(linksModule));
+  assert.deepEqual((await import(encode(linksModule))).MATCHUP_LINKS, { ネス: "https://ssbu-shiratsuki-theory.net/matchup/ness.html" });
 });

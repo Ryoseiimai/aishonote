@@ -569,3 +569,60 @@ input[type="search"] {
 .about-card a {
   color: var(--fg);
 }
+
+/* アプリ内ダイアログ（js/dialog.js。window.alert/confirm の代わり） */
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.dialog-box {
+  width: 100%;
+  max-width: 360px;
+  background: var(--bg);
+  color: var(--fg);
+  border-radius: 14px;
+  padding: 20px 16px 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+}
+
+.dialog-message {
+  margin: 0 0 16px;
+  font-size: 16px;
+  line-height: 1.6;
+  white-space: pre-line;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.dialog-actions button {
+  min-width: 96px;
+  padding: 0 16px;
+}
+
+/* iOSアプリでスクロールしたとき、ステータスバー（時刻・Dynamic Island）の下に本文が透けないよう塗る。ブラウザでは高さ0。 */
+body::before {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: env(safe-area-inset-top, 0px);
+  background: var(--bg);
+  z-index: 50;
+  pointer-events: none;
+}
+
+.dialog-box:focus {
+  outline: none;
+}

@@ -9,6 +9,8 @@ import { SSBU_FIGHTERS } from "../js/presets/ssbu.js";
 const ORIGIN = "https://ssbu-shiratsuki-theory.net";
 const INDEX_URL = `${ORIGIN}/chara_link.html`;
 const OUTPUT = new URL("../js/presets/matchup-reference.js", import.meta.url);
+// iOS版に同梱する「キャラ名→出典URL」だけの小さいファイル（得意・苦手の中身は入れない）。
+const LINKS_OUTPUT = new URL("../js/presets/matchup-links.js", import.meta.url);
 const USER_AGENT = "SmashNote-MatchupFetcher/1.0 (+https://github.com/Ryoseiimai/aishonote; offline reference data; serial requests; 3s interval)";
 // 出典サイトへの負荷を抑えるため、1リクエストごとに3秒空ける。期の更新時に手動で実行するだけで、CI・定期実行には組み込まない。
 export const REQUEST_INTERVAL_MS = 3000;
@@ -201,11 +203,13 @@ export async function collectReferences(fetchPage, warn = console.warn) {
   }
   const references = {};
   const failures = [];
+  const periods = new Set();
   for (const [slug, names] of Object.entries(SOURCE_FIGHTERS)) {
     if (names.some((name) => !fighterSet.has(name))) throw new Error(`ssbu.jsにない対応名: ${slug}`);
     try {
       if (!discovered.has(slug)) throw new Error("キャラ一覧にリンクがありません");
       const parsed = parseMatchupPage(await fetchPage(`${ORIGIN}/matchup/${slug}.html`), warn);
+      periods.add(parsed.period);
       for (const name of names) references[name] = makeReference(name, slug, parsed);
     } catch (error) {
       failures.push({ names, reason: error.message });
@@ -220,22 +224,51 @@ export async function collectReferences(fetchPage, warn = console.warn) {
       warn(`未対応のファイター: ${name}`);
     }
   }
-  return { references: ordered, failures };
+  if (periods.size > 1) warn(`キャラによって最新期が違います: ${[...periods].sort().join("・")}`);
+  const period = periods.size ? Math.max(...periods) : null;
+  return { references: ordered, failures, period };
 }
 
-async function main() {
-  console.warn("出典は勝率帯のみ公開。個別勝率・対戦数は取得不可。対戦数の追加フィルタは適用せず、出典の試合数選別と不明枠の除外を使用します。");
-  const { references, failures } = await collectReferences(createFetcher());
-  if (!Object.keys(references).length) throw new Error("取得0件のため既存ファイルを保持します");
+/** 取得日（日本時間の日付 YYYY-MM-DD）。UTC だと日本の早朝に前日の日付になるため JST で出す。 */
+export function jstDate(date = new Date()) {
+  return date.toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" });
+}
+
+/** js/presets/matchup-reference.js の中身（Web版だけが読み込む同梱データ）。 */
+export function renderReferenceModule(references, meta) {
   const header = [
     "// 自動生成・scripts/fetch-matchups.mjs で再生成。手編集しないこと。",
-    "// 出典: シラツキ理論 / スマメイトのオンラインレート戦（取得日: " + new Date().toISOString().slice(0, 10) + "）。",
+    `// 出典: シラツキ理論 / スマメイトのオンラインレート戦（第${meta.period}期・取得日: ${meta.fetchedAt}）。`,
     "// 個別勝率・対戦数は非公開。出典が公開する調整済みの1先勝率帯をそのまま記載。",
     "// 最新掲載期の並び順（不利→有利）で両端から各6件。自己対戦・不明を除外。",
     "// 出典の一定試合数以上という掲載条件を使用。追加の少数試合フィルタは不可。",
     "// 出典の統合5組は共通データとして展開し、noteに合算対象を明記。",
+    "// Web版だけが動的 import する。iOS版の www/ には scripts/sync-www.sh が同梱しない（matchup-links.js だけ入る）。",
   ].join("\n");
-  await writeFile(OUTPUT, `${header}\nexport const MATCHUP_REFERENCE = ${JSON.stringify(references, null, 2)};\n`);
+  return (
+    `${header}\nexport const MATCHUP_REFERENCE_META = ${JSON.stringify(meta)};\n` +
+    `export const MATCHUP_REFERENCE = ${JSON.stringify(references, null, 2)};\n`
+  );
+}
+
+/** js/presets/matchup-links.js の中身（キャラ名→出典ページURLだけ。iOS版のリンク案内用）。 */
+export function renderLinksModule(references) {
+  const links = Object.fromEntries(Object.entries(references).map(([name, ref]) => [name, ref.sources[0]]));
+  return [
+    "// 自動生成・scripts/fetch-matchups.mjs で再生成。手編集しないこと。",
+    "// キャラ名→シラツキ理論の相性表ページURLだけ。得意・苦手などの相性データは含めない（iOS版に同梱するのはこれだけ）。",
+    `export const MATCHUP_LINKS = ${JSON.stringify(links, null, 2)};`,
+    "",
+  ].join("\n");
+}
+
+async function main() {
+  console.warn("出典は勝率帯のみ公開。個別勝率・対戦数は取得不可。対戦数の追加フィルタは適用せず、出典の試合数選別と不明枠の除外を使用します。");
+  const { references, failures, period } = await collectReferences(createFetcher());
+  if (!Object.keys(references).length) throw new Error("取得0件のため既存ファイルを保持します");
+  const meta = { period, fetchedAt: jstDate() };
+  await writeFile(OUTPUT, renderReferenceModule(references, meta));
+  await writeFile(LINKS_OUTPUT, renderLinksModule(references));
   console.log(`取得できたキャラ数: ${Object.keys(references).length}/${SSBU_FIGHTERS.length}`);
   console.log(`取れなかったキャラ: ${failures.length ? failures.flatMap((failure) => failure.names).join("、") : "なし"}`);
 }

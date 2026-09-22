@@ -1,7 +1,8 @@
 import { SSBU_DRILLS } from "./presets/ssbu-drills.js";
 import { GENERIC_DRILLS } from "./drills-generic.js";
-import { MATCHUP_REFERENCE } from "./presets/matchup-reference.js";
-import { referenceView, isNativePlatform } from "./reference-display.js";
+import { MATCHUP_LINKS } from "./presets/matchup-links.js";
+import { referenceView, isNativePlatform, aboutSourceView, EMBED_REFERENCE_ON_NATIVE } from "./reference-display.js";
+import { showAlert, showConfirm } from "./dialog.js";
 import { SHIRATSUKI_URL, PRIVACY_POLICY_URL } from "./external-links.js";
 import {
   LOSS_TAGS,
@@ -40,6 +41,21 @@ let newFighterNameDraft = "";
 
 const root = document.getElementById("app");
 
+// 相性の目安の同梱データ（シラツキ理論の相性表の抜粋）は Web 版だけが読み込む。
+// iOS版は www/ にこのファイル自体が入らず（scripts/sync-www.sh）、MATCHUP_LINKS の出典URLでリンク案内だけ出す。
+const IS_NATIVE = isNativePlatform();
+let referenceModule = null; // { MATCHUP_REFERENCE, MATCHUP_REFERENCE_META }
+if (!IS_NATIVE || EMBED_REFERENCE_ON_NATIVE) {
+  import("./presets/matchup-reference.js")
+    .then((mod) => {
+      referenceModule = mod;
+      renderApp();
+    })
+    .catch(() => {
+      // 読み込めなければリンク案内のまま（MATCHUP_LINKS）で動かす。
+    });
+}
+
 function todayStr() {
   const d = new Date();
   const y = d.getFullYear();
@@ -73,7 +89,7 @@ function activeGameDrills() {
 function persist() {
   const ok = saveState(state);
   if (!ok) {
-    window.alert("データサイズが上限(4MB)を超えたため保存できませんでした。");
+    showAlert("データサイズが上限(4MB)を超えたため保存できませんでした。");
   }
 }
 
@@ -207,7 +223,7 @@ function renderHome() {
   ]);
 
   const refData = referenceDataFor(my);
-  const refView = referenceView(my, refData, { isNative: isNativePlatform() });
+  const refView = referenceView(my, refData, referenceOptions());
   const refNoteSection = !refView
     ? null
     : refView.mode === "link"
@@ -383,7 +399,7 @@ function fighterSelectField(label, fighters, value, onChange) {
 function onSubmitLog(e) {
   e.preventDefault();
   if (!logDraft.my || !logDraft.opponent) {
-    window.alert("自キャラと相手キャラを選んでください。");
+    showAlert("自キャラと相手キャラを選んでください。");
     return;
   }
   const match = {
@@ -424,8 +440,8 @@ function renderMatchItem(m) {
       {
         type: "button",
         className: "delete-btn",
-        onClick: () => {
-          if (window.confirm("この対戦記録を削除しますか？")) {
+        onClick: async () => {
+          if (await showConfirm("この対戦記録を削除しますか？", { okLabel: "削除", danger: true })) {
             setState({ matches: state.matches.filter((x) => x.id !== m.id) });
           }
         },
@@ -437,7 +453,13 @@ function renderMatchItem(m) {
 
 // ---------- 相性の目安(スマメイトの統計。対戦ログが無くても出す) ----------
 function referenceDataFor(my) {
-  return MATCHUP_REFERENCE[my] || null;
+  if (referenceModule) return referenceModule.MATCHUP_REFERENCE[my] || null;
+  // good/bad を持たない＝referenceView がリンク案内にする
+  return MATCHUP_LINKS[my] ? { sources: [MATCHUP_LINKS[my]] } : null;
+}
+
+function referenceOptions() {
+  return { isNative: IS_NATIVE, meta: referenceModule ? referenceModule.MATCHUP_REFERENCE_META : null };
 }
 
 function myStatsText(myFighterStats, opponentName) {
@@ -468,7 +490,7 @@ function externalLink(href, text, className) {
 
 function renderReferenceCard(my, myMatches) {
   const ref = referenceDataFor(my);
-  const view = referenceView(my, ref, { isNative: isNativePlatform() });
+  const view = referenceView(my, ref, referenceOptions());
   if (!view) return null;
   if (view.mode === "link") {
     return el("div", { className: "card" }, [
@@ -666,7 +688,7 @@ function onAddGame(e) {
   e.preventDefault();
   const name = newGameNameDraft.trim();
   if (!isValidFighterName(name)) {
-    window.alert("ゲーム名は1〜50字で入力してください。");
+    showAlert("ゲーム名は1〜50字で入力してください。");
     return;
   }
   const id = `custom_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
@@ -730,7 +752,7 @@ function renderFighterSection() {
   const addFighterForm = el("form", { className: "inline-form", onSubmit: onAddFighter }, [
     el("input", {
       type: "text",
-      placeholder: "カスタムキャラ名を追加（50字まで）",
+      placeholder: "キャラ名を追加（50字まで）",
       maxlength: MAX_NAME_LEN,
       value: newFighterNameDraft,
       onInput: (e) => (newFighterNameDraft = e.target.value),
@@ -758,13 +780,13 @@ function onAddFighter(e) {
   e.preventDefault();
   const name = newFighterNameDraft.trim();
   if (!isValidFighterName(name)) {
-    window.alert("キャラ名は1〜50字で入力してください。");
+    showAlert("キャラ名は1〜50字で入力してください。");
     return;
   }
   const gameId = state.activeGameId;
   const game = state.games[gameId];
   if (fightersOf(game).includes(name)) {
-    window.alert("同じ名前のキャラが既にあります。");
+    showAlert("同じ名前のキャラが既にあります。");
     return;
   }
   const updatedGame = { ...game, customFighters: [...game.customFighters, name] };
@@ -773,8 +795,8 @@ function onAddFighter(e) {
   setState({ games });
 }
 
-function onDeleteFighter(name) {
-  if (!window.confirm(`「${name}」を削除しますか？過去の対戦記録は残ります。`)) return;
+async function onDeleteFighter(name) {
+  if (!(await showConfirm(`「${name}」を削除しますか？過去の対戦記録は残ります。`, { okLabel: "削除", danger: true }))) return;
   const gameId = state.activeGameId;
   const game = state.games[gameId];
   const updatedGame = { ...game, customFighters: game.customFighters.filter((f) => f !== name) };
@@ -793,11 +815,9 @@ function onDeleteFighter(name) {
 function renderDataSection() {
   return el("div", { className: "card" }, [
     el("h2", {}, "データ"),
-    el(
-      "button",
-      { type: "button", className: "secondary-btn", onClick: onExport },
-      "JSONエクスポート"
-    ),
+    canExport()
+      ? el("button", { type: "button", className: "secondary-btn", onClick: onExport }, "JSONエクスポート")
+      : null,
     el("label", { className: "file-label" }, [
       "JSONインポート（ファイルを選ぶ）",
       el("input", { type: "file", accept: "application/json", onChange: onImportFile }),
@@ -811,6 +831,7 @@ function renderDataSection() {
 }
 
 function renderAboutSection() {
+  const about = aboutSourceView(referenceOptions());
   return el("div", { className: "card about-card" }, [
     el("h2", {}, "このアプリについて"),
     el(
@@ -818,8 +839,8 @@ function renderAboutSection() {
       {},
       "本アプリは個人が制作した非公式のファンツールで、任天堂株式会社および各キャラクターの権利者とは一切関係がなく、承認・提携を受けたものではありません。ゲームの画像・ロゴ・音声は使用していません。記載の名称は各社の商標または登録商標です。"
     ),
-    el("h3", {}, "相性データの出典"),
-    el("p", {}, [externalLink(SHIRATSUKI_URL, "シラツキ理論"), "（スマメイト第21期の統計・2026-09-23取得）"]),
+    el("h3", {}, about.heading),
+    el("p", {}, [externalLink(SHIRATSUKI_URL, "シラツキ理論"), about.suffix]),
     el("h3", {}, "プライバシー"),
     el("p", {}, [
       "記録はこの端末の中だけに保存され、外部に送信されません。",
@@ -829,11 +850,35 @@ function renderAboutSection() {
   ]);
 }
 
-function onExport() {
+function exportFile() {
   const json = JSON.stringify(state, null, 2);
-  const blob = new Blob([json], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = el("a", { href: url, download: `aishonote-${todayStr()}.json` }, "download");
+  return new File([json], `aishonote-${todayStr()}.json`, { type: "application/json" });
+}
+
+// iOSアプリ（WKWebView）は <a download> の blob: ダウンロードを扱えないため、共有シート（Web Share API）で書き出す。
+// 共有シートでファイルを渡せない環境ではボタン自体を出さない。
+function canExport() {
+  if (!IS_NATIVE) return true;
+  try {
+    const probe = new File(["{}"], "aishonote.json", { type: "application/json" });
+    return typeof navigator.share === "function" && typeof navigator.canShare === "function" && navigator.canShare({ files: [probe] });
+  } catch {
+    return false;
+  }
+}
+
+async function onExport() {
+  const file = exportFile();
+  if (IS_NATIVE) {
+    try {
+      await navigator.share({ files: [file] });
+    } catch (err) {
+      if (!err || err.name !== "AbortError") showAlert("書き出せませんでした。");
+    }
+    return;
+  }
+  const url = URL.createObjectURL(file);
+  const a = el("a", { href: url, download: file.name }, "download");
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -844,22 +889,22 @@ function onImportFile(e) {
   const file = e.target.files && e.target.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = () => {
+  reader.onload = async () => {
     let parsed;
     try {
       parsed = JSON.parse(String(reader.result));
     } catch {
-      window.alert("JSONとして読み込めませんでした。");
+      showAlert("JSONとして読み込めませんでした。");
       e.target.value = "";
       return;
     }
     const result = validateImport(parsed);
     if (!result.ok) {
-      window.alert(`インポートに失敗しました:\n${result.errors.join("\n")}`);
+      showAlert(`インポートに失敗しました:\n${result.errors.join("\n")}`);
       e.target.value = "";
       return;
     }
-    if (!window.confirm("現在のデータを上書きしてインポートします。よろしいですか？")) {
+    if (!(await showConfirm("現在のデータを上書きしてインポートします。よろしいですか？", { okLabel: "インポート" }))) {
       e.target.value = "";
       return;
     }
@@ -873,9 +918,9 @@ function onImportFile(e) {
   reader.readAsText(file);
 }
 
-function onEraseAll() {
-  if (!window.confirm("本当に全データを消去しますか？")) return;
-  if (!window.confirm("この操作は取り消せません。もう一度確認します。本当に消去しますか？")) return;
+async function onEraseAll() {
+  if (!(await showConfirm("本当に全データを消去しますか？", { okLabel: "消去", danger: true }))) return;
+  if (!(await showConfirm("この操作は取り消せません。もう一度確認します。本当に消去しますか？", { okLabel: "消去する", danger: true }))) return;
   state = {
     version: 2,
     games: { [DEFAULT_GAME_ID]: { id: DEFAULT_GAME_ID, name: "大乱闘スマッシュブラザーズ SPECIAL", isPreset: true, customFighters: [] } },

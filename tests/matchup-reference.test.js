@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { MATCHUP_REFERENCE } from "../js/presets/matchup-reference.js";
+import { readFileSync } from "node:fs";
+import { MATCHUP_REFERENCE, MATCHUP_REFERENCE_META } from "../js/presets/matchup-reference.js";
+import { MATCHUP_LINKS } from "../js/presets/matchup-links.js";
 import { SSBU_FIGHTERS } from "../js/presets/ssbu.js";
 
 const fighterSet = new Set(SSBU_FIGHTERS);
@@ -47,5 +49,22 @@ test("MATCHUP_REFERENCE: 合算5組は同じ出典を持ち、合算対象を表
       assert.ok(item.note.includes(`自キャラ: ${a}／${b}合算`));
       assert.ok(![a, b].includes(item.name));
     }
+  }
+});
+
+test("MATCHUP_REFERENCE_META: 期は正の整数、取得日はYYYY-MM-DD", () => {
+  assert.deepEqual(Object.keys(MATCHUP_REFERENCE_META).sort(), ["fetchedAt", "period"]);
+  assert.ok(Number.isInteger(MATCHUP_REFERENCE_META.period) && MATCHUP_REFERENCE_META.period > 0);
+  assert.match(MATCHUP_REFERENCE_META.fetchedAt, /^\d{4}-\d{2}-\d{2}$/);
+});
+
+test("MATCHUP_LINKS: iOS同梱用はキャラ名→出典URLだけで、同梱データの出典と一致する", () => {
+  assert.deepEqual(
+    MATCHUP_LINKS,
+    Object.fromEntries(Object.entries(MATCHUP_REFERENCE).map(([name, ref]) => [name, ref.sources[0]]))
+  );
+  const source = readFileSync(new URL("../js/presets/matchup-links.js", import.meta.url), "utf8");
+  for (const word of ['"good"', '"bad"', '"note"', "有利", "不利", "五分"]) {
+    assert.ok(!source.includes(word), `matchup-links.js に相性データ（${word}）を入れない`);
   }
 });

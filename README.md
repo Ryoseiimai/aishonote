@@ -26,12 +26,14 @@ python3 -m http.server 8000
 
 Node.js 22以降で `node scripts/fetch-matchups.mjs` を実行すると、
 [シラツキ理論](https://ssbu-shiratsuki-theory.net/chara_link.html)のキャラ一覧と各相性ページを
-連絡先入りのUser-Agent付き・直列・リクエスト間3秒で取得し、`js/presets/matchup-reference.js` を上書きします。
+連絡先入りのUser-Agent付き・直列・リクエスト間3秒で取得し、`js/presets/matchup-reference.js`（相性データ＋期・取得日（日本時間）の
+`MATCHUP_REFERENCE_META`）と `js/presets/matchup-links.js`（キャラ名→出典ページURLだけ）を上書きします。
 ブラウザでは同梱データのみを表示し、外部サイトへの自動アクセスは行いません。
 取得スクリプトはレート戦の期が更新されたときだけ手動で実行する。CIや定期実行には組み込まない。
 
-Web版は同梱データ（相性表の抜粋）を表示します。iOSアプリ版は出典の運営者の許諾が取れるまで同梱データを表示せず、
-出典の相性表ページへのリンク（タップしたときだけSafariで開く）だけを出します（`js/reference-display.js` の
+Web版は同梱データ（相性表の抜粋）を読み込んで表示します。iOSアプリ版は出典の運営者の許諾が取れるまで、
+相性データのファイル自体をアプリに入れず（`scripts/sync-www.sh` が `matchup-reference.js` を `www/` から外す）、
+`matchup-links.js` の出典の相性表ページへのリンク（タップしたときだけSafariで開く）だけを出します（`js/reference-display.js` の
 `EMBED_REFERENCE_ON_NATIVE`）。
 
 出典の最新掲載はスマメイト21期です（現在のレート戦期間とは限りません）。公開されているのは、

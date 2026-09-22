@@ -89,10 +89,17 @@ jobs:
             exit 1
           fi
 
-          echo "-- 外部URLの検出(js/ と index.html 内、SVG名前空間 w3.org/2000/svg と js/presets/matchup-reference.js・js/external-links.js のリンク先URL文字列は許可) --"
-          # matchup-reference.js / external-links.js の URL は fetch/script/style/font として読み込まれることはなく、
-          # 相性データの出典・プライバシーポリシーへの外部リンク(rel=noopener noreferrer)の宛先になるだけの許可済みデータ。
-          if grep -RnE 'https?://' js/ index.html | grep -v 'w3\.org/2000/svg' | grep -v '^js/presets/matchup-reference\.js:' | grep -v '^js/external-links\.js:'; then
+          echo "-- 外部URLの検出(js/ と index.html 内。許可はURL単位で、SVG名前空間と下記の外部リンク先だけ) --"
+          # 許可するURL（ファイル名:行番号:URL の形で1件ずつ照合。同じファイルに別のURLを足すとCIが落ちる）:
+          #   - dom.js の SVG 名前空間 http://www.w3.org/2000/svg（ネットワークアクセスなし）
+          #   - external-links.js の出典サイトトップ https://ssbu-shiratsuki-theory.net/ と
+          #     プライバシーポリシー https://github.com/Ryoseiimai/aishonote/blob/main/docs/privacy.md
+          #   - presets/matchup-reference.js・presets/matchup-links.js の相性表ページ https://ssbu-shiratsuki-theory.net/matchup/<slug>.html
+          # いずれも fetch/script/style/font として読み込まれることはなく、外部リンク(rel=noopener noreferrer)の宛先になるだけ。
+          if grep -RnoE 'https?://[^"'"'"'`[:space:]]*' js/ index.html \
+            | grep -vE '^js/dom\.js:[0-9]+:http://www\.w3\.org/2000/svg$' \
+            | grep -vE '^js/external-links\.js:[0-9]+:(https://ssbu-shiratsuki-theory\.net/|https://github\.com/Ryoseiimai/aishonote/blob/main/docs/privacy\.md)$' \
+            | grep -vE '^js/presets/matchup-(reference|links)\.js:[0-9]+:https://ssbu-shiratsuki-theory\.net/matchup/[a-z0-9_]+\.html$'; then
             echo "外部URLが見つかりました。依存/CDN/フォント等の外部参照は禁止です。"
             exit 1
           fi

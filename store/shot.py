@@ -1,4 +1,6 @@
-# 相性ノート App Store 用スクリーンショット撮影（6.9インチ 1290x2796）。
+# 相性ノートの画面確認用スクリーンショット（Playwright WebKit・1290x2796）。
+# App Store に出す画像は store/sim_shot.py（iOSシミュレータの実機描画・ステータスバー付き）で撮る。これはその下見と
+# Web版の確認用で、出力は build/web-shots/（コミットしない）。シードデータ build_state() は sim_shot.py も使う。
 # 使い方: python3 store/shot.py  （リポジトリ直下を自前の一時HTTPサーバーで配信して撮る）
 # iPhone相当の 430x932 CSS px を 3倍で撮る＝1290x2796。レンダラは iOS と同系の WebKit。
 # ビューポート撮影（fullPage ではない）。固定の下タブがカードを中途半端に切らないよう各画面でスクロール位置を調整する。
@@ -15,8 +17,7 @@ from datetime import date, timedelta
 from playwright.sync_api import sync_playwright
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-OUTDIR = os.path.join(BASE, "store", "screenshots")
-os.makedirs(OUTDIR, exist_ok=True)
+OUTDIR = os.path.join(BASE, "build", "web-shots")
 
 CSS_W, CSS_H, SCALE = 430, 932, 3
 TARGET = (1290, 2796)
@@ -153,6 +154,7 @@ def open_app(browser, url, native):
 
 
 def shot(page, name):
+    os.makedirs(OUTDIR, exist_ok=True)
     page.wait_for_timeout(200)
     path = os.path.join(OUTDIR, name)
     page.screenshot(path=path)  # ビューポート撮影
