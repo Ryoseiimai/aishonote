@@ -6,7 +6,7 @@ cd "$(dirname "$0")/.."
 
 mkdir -p www
 
-rsync -a --delete \
+rsync -a --delete --delete-excluded \
   --exclude 'SPEC.md' \
   --exclude 'tests/' \
   --exclude '.github/' \
@@ -14,6 +14,9 @@ rsync -a --delete \
   --exclude 'ios/' \
   --exclude 'node_modules/' \
   --exclude 'www/' \
+  --exclude 'build/' \
+  --exclude '控え/' \
+  --exclude 'docs/' \
   --exclude 'scripts/' \
   --exclude 'package.json' \
   --exclude 'package-lock.json' \

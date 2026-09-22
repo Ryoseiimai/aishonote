@@ -1,184 +1,217 @@
-# 相性ノート用スクリーンショット撮影スクリプト。
-# round-robin-scoreboard の shot.py を流用した雛形。TEAMS/fill_onboard 等の
-# オンボーディング操作は元アプリ（総当たりスコアボード）専用のセレクタのままなので、
-# www/ の実UIが完成し次第、実際の画面遷移・セレクタに合わせて書き換えること。
+# 相性ノート App Store 用スクリーンショット撮影（6.9インチ 1290x2796）。
+# 使い方: python3 store/shot.py  （リポジトリ直下を自前の一時HTTPサーバーで配信して撮る）
+# iPhone相当の 430x932 CSS px を 3倍で撮る＝1290x2796。レンダラは iOS と同系の WebKit。
+# ビューポート撮影（fullPage ではない）。固定の下タブがカードを中途半端に切らないよう各画面でスクロール位置を調整する。
+import functools
+import http.server
+import os
+import random
+import threading
+from datetime import date, timedelta
 
-import time, os
 from playwright.sync_api import sync_playwright
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-URL = "file://" + BASE + "/www/index.html"
+OUTDIR = os.path.join(BASE, "store", "screenshots")
+os.makedirs(OUTDIR, exist_ok=True)
 
-SIZES = {
-    "6.9inch": {"css": (440, 956), "scale": 3, "target": (1320, 2868)},
-    "6.5inch": {"css": (414, 896), "scale": 3, "target": (1242, 2688)},
-}
+CSS_W, CSS_H, SCALE = 430, 932, 3
+TARGET = (1290, 2796)
 
-TEAMS = [
-    ("レッド", "red", ["ハルト", "ソウタ", "ユウキ", "ミオ", "サクラ", "アオイ"]),
-    ("ブルー", "blue", ["カイト", "レン", "ダイキ", "ヒナ", "ユイ", "リン"]),
-    ("グリーン", "green", ["ショウ", "ツバサ", "リョウ", "ミサキ", "エマ", "ノア"]),
-    ("イエロー", "yellow", ["タイガ", "ジン", "コウキ", "モモカ", "コトネ", "アカリ"]),
+GAME = "ssbu"
+MY_FIGHTERS = ["ネス", "マリオ"]
+ACTIVE = "ネス"
+
+MEMOS = [
+    "PKファイヤーを置いてから掴みを通す",
+    "復帰はPKサンダーの角度を散らす",
+    "着地は空Nで暴れず横に逃げる",
+    "崖端の飛び道具を反射されないよう待つ",
+]
+
+# (相手, 結果, 負け理由)。ネスの「一般的な相性の目安」に載る相手を中心に並べ、
+# 相性カードの各キャラの横に「あなたは○勝○敗」が出るようにする。
+PLAN = [
+    ("フォックス", "win", []),
+    ("フォックス", "win", []),
+    ("フォックス", "lose", ["早期撃墜された"]),
+    ("フォックス", "win", []),
+    ("フォックス", "win", []),
+    ("パックマン", "lose", ["復帰阻止された"]),
+    ("パックマン", "lose", ["飛び道具に触れない"]),
+    ("パックマン", "win", []),
+    ("パックマン", "lose", ["復帰阻止された", "崖攻めが弱い"]),
+    ("パックマン", "lose", ["着地を狩られた"]),
+    ("勇者", "lose", ["飛び道具に触れない"]),
+    ("勇者", "win", []),
+    ("勇者", "lose", ["復帰阻止された"]),
+    ("スネーク", "win", []),
+    ("スネーク", "win", []),
+    ("メタナイト", "win", []),
+    ("メタナイト", "lose", ["着地を狩られた"]),
+    ("ピーチ", "lose", ["コンボ火力負け"]),
+    ("ピーチ", "lose", ["着地を狩られた"]),
+    ("ピーチ", "win", []),
 ]
 
 
-def fill_onboard(page):
-    # Step1: names + colors already default colors match order; just set names
-    # NOTE: mini-num-input (match/break minutes) is also type=text, so scope to .team-block only
-    inputs = page.locator("#onboardBody .team-block input[type=text]")
-    n = inputs.count()
-    names = ["レッド", "ブルー", "イエロー", "グリーン"]
-    for i in range(min(4, n)):
-        inputs.nth(i).fill(names[i])
-    page.click("#btnOnboardNext")
+def build_state():
+    random.seed(7)
+    today = date.today()
+    matches = []
+    for i, (opp, result, tags) in enumerate(PLAN):
+        d = today - timedelta(days=(len(PLAN) - i) * 2 // 3)
+        matches.append(
+            {
+                "id": f"m_seed_{i}",
+                "gameId": GAME,
+                "date": d.isoformat(),
+                "my": ACTIVE,
+                "opponent": opp,
+                "result": result,
+                "tags": tags,
+                "memo": random.choice(MEMOS) if result == "lose" and random.random() < 0.6 else "",
+                "createdAt": 1790000000000 + i,
+            }
+        )
+    matchups = {
+        f"{GAME}__{ACTIVE}__パックマン": {"mark": "bad", "memo": "消火栓の処理を先に考える"},
+        f"{GAME}__{ACTIVE}__フォックス": {"mark": "good", "memo": ""},
+        f"{GAME}__{ACTIVE}__勇者": {"mark": "bad", "memo": ""},
+    }
+    return {
+        "version": 2,
+        "games": {
+            GAME: {
+                "id": GAME,
+                "name": "大乱闘スマッシュブラザーズ SPECIAL",
+                "isPreset": True,
+                "customFighters": [],
+            }
+        },
+        "activeGameId": GAME,
+        "myFightersByGame": {GAME: MY_FIGHTERS},
+        "activeFighterByGame": {GAME: ACTIVE},
+        "matches": matches,
+        "matchups": matchups,
+    }
+
+
+def start_server():
+    class Quiet(http.server.SimpleHTTPRequestHandler):
+        def log_message(self, *a):
+            pass
+
+    handler = functools.partial(Quiet, directory=BASE)
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), handler)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv, f"http://127.0.0.1:{srv.server_address[1]}/index.html"
+
+
+def click_tab(page, label):
+    page.click(f"nav.bottom-nav >> text={label}")
+    page.wait_for_timeout(250)
+    page.evaluate("window.scrollTo(0, 0)")
+
+
+def scroll_card_to_top(page, heading):
+    """見出し heading で始まるカードの上端が画面上部に来るようスクロールする。"""
+    page.evaluate(
+        """(t) => {
+          const h = [...document.querySelectorAll('.card h2')].find(x => x.textContent.startsWith(t));
+          if (!h) return;
+          // ページ末尾でスクロールが止まらないよう、撮影時だけ本文の下に空白を足す（画面下部は元々空白なので見た目は同じ）
+          if (!document.getElementById('shot-spacer')) {
+            const sp = document.createElement('div');
+            sp.id = 'shot-spacer';
+            sp.style.height = window.innerHeight + 'px';
+            document.getElementById('app').appendChild(sp);
+          }
+          const card = h.closest('.card');
+          const prev = card.previousElementSibling;
+          // 前のカードの下端が1pxも見えない位置（=カード間の余白から始まる位置）まで送る
+          const y = prev ? prev.getBoundingClientRect().bottom + 1 : card.getBoundingClientRect().top - 12;
+          window.scrollTo(0, window.scrollY + y);
+        }""",
+        heading,
+    )
+
+
+def shot(page, name):
     page.wait_for_timeout(200)
-    # Step2: members
-    team_inputs = page.locator("#onboardBody .team-block input[type=text]")
-    members_by_team = [
-        ["ハルト", "ソウタ", "ユウキ", "ミオ", "サクラ", "アオイ"],
-        ["カイト", "レン", "ダイキ", "ヒナ", "ユイ", "リン"],
-        ["タイガ", "ジン", "コウキ", "モモカ", "コトネ", "アカリ"],
-        ["ショウ", "ツバサ", "リョウ", "ミサキ", "エマ", "ノア"],
-    ]
-    idx = 0
-    flat = [name for team in members_by_team for name in team]
-    total = team_inputs.count()
-    for i in range(min(total, len(flat))):
-        team_inputs.nth(i).fill(flat[i])
-    page.wait_for_timeout(200)
-    page.click("#btnOnboardNext")
-    page.wait_for_timeout(200)
-    page.click("#btnOnboardNext")  # start tournament
-    page.wait_for_timeout(300)
+    path = os.path.join(OUTDIR, name)
+    page.screenshot(path=path)  # ビューポート撮影
+    return path
 
 
-def resize_to(path, target_w, target_h):
-    from PIL import Image
-    img = Image.open(path)
-    if img.size != (target_w, target_h):
-        img = img.resize((target_w, target_h), Image.LANCZOS)
-        img.save(path)
-
-
-def capture_for_size(p, label, cfg):
-    css_w, css_h = cfg["css"]
-    scale = cfg["scale"]
-    browser = p.chromium.launch()
-    page = browser.new_page(viewport={"width": css_w, "height": css_h}, device_scale_factor=scale)
-    page.goto(URL)
-    page.wait_for_timeout(300)
-
-    outdir = os.path.join(BASE, "store", "screenshots", label)
-    os.makedirs(outdir, exist_ok=True)
-
-    fill_onboard(page)
-
-    # 01: onboarding wizard - go back to step to show it, but tournament already started.
-    # Instead reload and capture step1 screen fresh in a new page for the wizard shot.
-    page2 = browser.new_page(viewport={"width": css_w, "height": css_h}, device_scale_factor=scale)
-    page2.goto(URL)
-    page2.wait_for_timeout(300)
-    inputs = page2.locator("#onboardBody .team-block input[type=text]")
-    names = ["レッド", "ブルー", "イエロー", "グリーン"]
-    for i in range(min(4, inputs.count())):
-        inputs.nth(i).fill(names[i])
-    page2.evaluate("window.scrollTo(0,0)")
-    page2.wait_for_timeout(200)
-    p1 = os.path.join(outdir, "01.png")
-    page2.screenshot(path=p1)
-    resize_to(p1, *cfg["target"])
-    page2.close()
-
-    # Now on matches list. Click first match to enter live scoring.
-    page.click("#screen-matches .match-card >> nth=0")
-    page.wait_for_timeout(300)
-    # tap some scores to make it look lively
-    home_btns = page.locator("#homeMembers .member-btn")
-    away_btns = page.locator("#awayMembers .member-btn")
-    for i in [0, 1, 0, 2]:
-        if home_btns.count() > i:
-            home_btns.nth(i).click()
-            page.wait_for_timeout(80)
-    for i in [1, 0]:
-        if away_btns.count() > i:
-            away_btns.nth(i).click()
-            page.wait_for_timeout(80)
-    page.wait_for_timeout(200)
-    p2 = os.path.join(outdir, "02.png")
-    page.screenshot(path=p2)
-    resize_to(p2, *cfg["target"])
-
-    # finish this match and a few more to populate standings
-    page.click("#btnFinish")
-    page.wait_for_timeout(150)
-    page.click("#btnFinishConfirm")
-    page.wait_for_timeout(200)
-    # play through remaining matches quickly to get standings populated
-    for _ in range(11):
-        next_btn = page.locator("#btnNextMatch")
-        if next_btn.count() > 0 and next_btn.is_visible():
-            next_btn.click()
-            page.wait_for_timeout(150)
-            hb = page.locator("#homeMembers .member-btn")
-            ab = page.locator("#awayMembers .member-btn")
-            if hb.count() > 0:
-                hb.nth(0).click()
-                page.wait_for_timeout(50)
-            if ab.count() > 0:
-                ab.nth(0).click()
-                page.wait_for_timeout(50)
-                ab.nth(0).click()
-                page.wait_for_timeout(50)
-            page.click("#btnFinish")
-            page.wait_for_timeout(120)
-            page.click("#btnFinishConfirm")
-            page.wait_for_timeout(150)
-        else:
-            break
-
-    # 03: standings/rank screen
-    page.click('nav button[data-screen="rank"]')
-    page.wait_for_timeout(300)
-    p3 = os.path.join(outdir, "03.png")
-    page.screenshot(path=p3)
-    resize_to(p3, *cfg["target"])
-
-    # 04: finale screen - by this point all 12 matches are already "done" (finished above).
-    # Reopen the last match, "re-open" it (btnFinish becomes 再開), then finish it again so
-    # findNextPendingIndex() returns null and the "🏆 表彰式を見る" (btnGoFinale) button appears.
-    page.click('nav button[data-screen="matches"]')
-    page.wait_for_timeout(200)
-    cards = page.locator("#matchesList .match-card")
-    total_cards = cards.count()
-    if total_cards > 0:
-        cards.nth(total_cards - 1).click()
-        page.wait_for_timeout(200)
-        page.click("#btnFinish")  # status done -> becomes ongoing (再開)
-        page.wait_for_timeout(150)
-        page.click("#btnFinish")  # ongoing -> show finish confirm panel
-        page.wait_for_timeout(150)
-        page.click("#btnFinishConfirm")
-        page.wait_for_timeout(250)
-        gofinale = page.locator("#btnGoFinale")
-        if gofinale.count() > 0:
-            gofinale.click()
+def main():
+    srv, url = start_server()
+    out = []
+    try:
+        with sync_playwright() as p:
+            browser = p.webkit.launch()
+            ctx = browser.new_context(
+                viewport={"width": CSS_W, "height": CSS_H},
+                device_scale_factor=SCALE,
+                color_scheme="light",
+                locale="ja-JP",
+            )
+            page = ctx.new_page()
+            errors = []
+            page.on("pageerror", lambda e: errors.append(str(e)))
+            page.goto(url)
+            page.evaluate(
+                "(s) => window.localStorage.setItem('aishonote.v1', JSON.stringify(s))", build_state()
+            )
+            page.reload()
+            page.wait_for_selector("nav.bottom-nav")
             page.wait_for_timeout(300)
 
-    p4 = os.path.join(outdir, "04.png")
-    page.screenshot(path=p4)
-    resize_to(p4, *cfg["target"])
+            # 01 ホーム（次に潰す相性・相性の目安・勝率サマリー・上達グラフを1画面に）
+            scroll_card_to_top(page, "次に潰す相性")
+            out.append(shot(page, "01_home.png"))
 
-    # 05: matches list overview (final state, all done badges)
-    page.click('nav button[data-screen="matches"]')
-    page.wait_for_timeout(300)
-    p5 = os.path.join(outdir, "05.png")
-    page.screenshot(path=p5)
-    resize_to(p5, *cfg["target"])
+            # 02 記録（負け理由のタグが見える状態）
+            click_tab(page, "記録")
+            page.locator(".log-form select").nth(1).select_option("パックマン")
+            page.check("input[type=radio][value=lose]")
+            page.wait_for_timeout(200)
+            page.check("label.tag-checkbox:has-text('復帰阻止された') input")
+            page.check("label.tag-checkbox:has-text('飛び道具に触れない') input")
+            page.wait_for_timeout(200)
+            out.append(shot(page, "02_log.png"))
 
-    browser.close()
+            # 03 相性（一般的な相性の目安カードを最上部に大きく）
+            click_tab(page, "相性")
+            page.wait_for_selector(".card:has(h2:text('一般的な相性の目安'))")
+            out.append(shot(page, "03_matchup.png"))
+
+            # 04 設定（マイキャラ設定を画面上部に）
+            click_tab(page, "設定")
+            scroll_card_to_top(page, "マイキャラ設定")
+            # キャラ一覧（内側スクロール）をネスが見える位置へ
+            page.evaluate(
+                """() => {
+                  const list = document.querySelector('.fighter-checklist');
+                  const row = [...list.querySelectorAll('.fighter-checkbox')].find(r => r.textContent.trim() === 'ネス');
+                  if (row) list.scrollTop = row.offsetTop - list.offsetTop - 4 * row.offsetHeight;
+                }"""
+            )
+            out.append(shot(page, "04_settings.png"))
+
+            browser.close()
+            if errors:
+                raise SystemExit(f"page errors: {errors}")
+    finally:
+        srv.shutdown()
+
+    from PIL import Image
+
+    for pth in out:
+        size = Image.open(pth).size
+        assert size == TARGET, f"{pth}: {size} != {TARGET}"
+        print(pth, size)
 
 
-with sync_playwright() as p:
-    for label, cfg in SIZES.items():
-        capture_for_size(p, label, cfg)
-        print("done", label)
+if __name__ == "__main__":
+    main()

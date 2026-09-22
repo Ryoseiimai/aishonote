@@ -38,7 +38,9 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
   font-size: 16px;
   line-height: 1.6;
-  padding-bottom: 72px;
+  /* iOS外殻は contentInset:never ＋ viewport-fit=cover。ノッチ/ホームバー分は env() で確保（ブラウザでは0） */
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: calc(72px + env(safe-area-inset-bottom, 0px));
 }
 
 #app {
@@ -249,11 +251,15 @@ input[type="search"] {
 }
 
 .tag-checkbox,
-.radio-label {
+.radio-label,
+.log-form .tag-checkbox,
+.log-form .radio-label {
   display: flex;
+  flex-direction: row;
   align-items: center;
   gap: 8px;
   min-height: 44px;
+  font-size: 16px;
 }
 
 .fighter-checkbox {
@@ -439,6 +445,7 @@ input[type="search"] {
   border-top: 1px solid var(--border);
   max-width: 480px;
   margin: 0 auto;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 .nav-btn {

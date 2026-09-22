@@ -3,15 +3,15 @@
   "appName": "相性ノート",
   "webDir": "www",
   "ios": {
-    "backgroundColor": "#111111",
+    "backgroundColor": "#ffffff",
     "preferredContentMode": "mobile",
-    "contentInset": "automatic"
+    "contentInset": "never"
   },
   "plugins": {
     "SplashScreen": {
       "launchShowDuration": 0,
       "launchAutoHide": true,
-      "backgroundColor": "#111111",
+      "backgroundColor": "#ffffff",
       "showSpinner": false
     },
     "StatusBar": {
