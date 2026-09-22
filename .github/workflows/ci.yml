@@ -89,10 +89,10 @@ jobs:
             exit 1
           fi
 
-          echo "-- 外部URLの検出(js/ と index.html 内、SVG名前空間 w3.org/2000/svg と js/presets/matchup-reference.js の出典URL文字列は許可) --"
-          # matchup-reference.js の URL は fetch/script/style/font として読み込まれることはなく、
-          # 相性データの出典として画面に文字列表示・外部リンク(rel=noopener noreferrer)されるだけの許可済みデータ。
-          if grep -RnE 'https?://' js/ index.html | grep -v 'w3\.org/2000/svg' | grep -v '^js/presets/matchup-reference\.js:'; then
+          echo "-- 外部URLの検出(js/ と index.html 内、SVG名前空間 w3.org/2000/svg と js/presets/matchup-reference.js・js/external-links.js のリンク先URL文字列は許可) --"
+          # matchup-reference.js / external-links.js の URL は fetch/script/style/font として読み込まれることはなく、
+          # 相性データの出典・プライバシーポリシーへの外部リンク(rel=noopener noreferrer)の宛先になるだけの許可済みデータ。
+          if grep -RnE 'https?://' js/ index.html | grep -v 'w3\.org/2000/svg' | grep -v '^js/presets/matchup-reference\.js:' | grep -v '^js/external-links\.js:'; then
             echo "外部URLが見つかりました。依存/CDN/フォント等の外部参照は禁止です。"
             exit 1
           fi

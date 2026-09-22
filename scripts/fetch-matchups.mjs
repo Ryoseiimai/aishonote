@@ -9,7 +9,9 @@ import { SSBU_FIGHTERS } from "../js/presets/ssbu.js";
 const ORIGIN = "https://ssbu-shiratsuki-theory.net";
 const INDEX_URL = `${ORIGIN}/chara_link.html`;
 const OUTPUT = new URL("../js/presets/matchup-reference.js", import.meta.url);
-const USER_AGENT = "SmashNote-MatchupFetcher/1.0 (offline reference data; serial requests; 1s interval)";
+const USER_AGENT = "SmashNote-MatchupFetcher/1.0 (+https://github.com/Ryoseiimai/aishonote; offline reference data; serial requests; 3s interval)";
+// 出典サイトへの負荷を抑えるため、1リクエストごとに3秒空ける。期の更新時に手動で実行するだけで、CI・定期実行には組み込まない。
+export const REQUEST_INTERVAL_MS = 3000;
 
 // chara_link.html のリンク・表記と各ページの見出しを照合した対応表。
 // 出典は5組を統合: サムス、ピーチ、マルス/ルキナ、ピット、シモン/リヒター。
@@ -166,7 +168,8 @@ export function makeReference(my, slug, parsed) {
     if (opponents.length > 1) shared.push(`相手: ${opponents.join("／")}合算`);
     return {
       name: row.name,
-      note: `${row.label}（スマメイト統計・第${parsed.period}期${shared.length ? `・${shared.join("・")}` : ""}）`,
+      // 期や統計の説明は画面の説明文に集約。noteは区分と合算注記だけ。
+      note: shared.length ? `${row.label}（${shared.join("・")}）` : row.label,
     };
   };
   return {
@@ -179,7 +182,7 @@ export function makeReference(my, slug, parsed) {
 export function createFetcher(fetchImpl = fetch, wait = sleep) {
   return async (url) => {
     // リトライ・並列処理はしない。呼び出し側も必ずawaitする。
-    await wait(1000);
+    await wait(REQUEST_INTERVAL_MS);
     const response = await fetchImpl(url, {
       headers: { "User-Agent": USER_AGENT, Accept: "text/html" },
       signal: AbortSignal.timeout(20000),

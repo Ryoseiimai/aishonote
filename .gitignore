@@ -4,3 +4,4 @@ ios/App/build/
 DerivedData/
 www/
 .DS_Store
+__pycache__/

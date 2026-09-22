@@ -17,7 +17,8 @@ test("MATCHUP_REFERENCE: 全キャラのgood/badに1〜6件の実在する相手
       for (const item of ref[kind]) {
         assert.ok(fighterSet.has(item.name), `${my}: ${item.name}`);
         assert.notEqual(item.name, my, `${my}: 自分自身を含まない`);
-        assert.match(item.note, /^(?:有利|微有利|不利|微不利|五分)（スマメイト統計・第\d+期/);
+        // noteは区分だけ。統合5組のときだけ合算注記を括弧で付ける（期・統計の文言は画面の説明文に集約）。
+        assert.match(item.note, /^(?:有利|微有利|不利|微不利|五分)(?:（(?:自キャラ|相手): [^（）]+合算(?:・相手: [^（）]+合算)?）)?$/);
         assert.ok(item.note.length <= 500, `${my}: noteの長さ`);
         assert.ok(!item.note.includes("n="), "非公開の対戦数を作らない");
       }

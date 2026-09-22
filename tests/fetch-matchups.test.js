@@ -8,6 +8,7 @@ import {
   makeReference,
   createFetcher,
   collectReferences,
+  REQUEST_INTERVAL_MS,
 } from "../scripts/fetch-matchups.mjs";
 
 // 出典HTMLの構造だけを再現。実データのダウンロードなしで抽出の境界を検証する。
@@ -69,29 +70,34 @@ test("fetch-matchups: 両端の各6件を選び、自己・同じ統合枠を除
   const items = [...ref.good, ...ref.bad];
   assert.equal(new Set(items.map((item) => item.name)).size, 12);
   assert.ok(items.every((item) => !["ピーチ", "デイジー"].includes(item.name)));
-  assert.ok(items.every((item) => item.note.includes("21期") && item.note.includes("自キャラ: ピーチ／デイジー合算")));
+  assert.ok(items.every((item) => /^(?:不利|微不利|五分|微有利|有利)（/.test(item.note) && item.note.includes("自キャラ: ピーチ／デイジー合算")));
+  assert.ok(items.every((item) => !item.note.includes("期") && !item.note.includes("スマメイト")));
 });
 
 test("fetch-matchups: 統合された相手を正規化して注記し、数値を推定しない", () => {
   const parsed = parseMatchupPage(page(section(21, basicGroups)));
   const ref = makeReference("ネス", "ness", parsed);
   assert.deepEqual(ref.bad.slice(0, 2).map((item) => item.name), ["ピーチ", "デイジー"]);
-  assert.equal(ref.bad[0].note, "不利（スマメイト統計・第21期・相手: ピーチ／デイジー合算）");
+  assert.equal(ref.bad[0].note, "不利（相手: ピーチ／デイジー合算）");
+  assert.equal(ref.bad[2].note, "不利");
+  assert.equal(ref.good[0].note, "有利");
   assert.ok([...ref.good, ...ref.bad].every((item) => !item.note.includes("n=")));
 });
 
-test("fetch-matchups: HTTP取得ごとに1秒待ち、User-Agentを明記する", async () => {
+test("fetch-matchups: HTTP取得ごとに3秒待ち、連絡先入りのUser-Agentを明記する", async () => {
   const calls = [];
   const fetchPage = createFetcher(async (url, options) => {
     calls.push(url);
     assert.match(options.headers["User-Agent"], /SmashNote/);
+    assert.ok(options.headers["User-Agent"].includes("https://github.com/Ryoseiimai/aishonote"));
     assert.equal(options.redirect, "error");
     assert.ok(options.signal instanceof AbortSignal);
     return { ok: true, text: async () => "html" };
   }, async (ms) => calls.push(ms));
   assert.equal(await fetchPage("first"), "html");
   assert.equal(await fetchPage("second"), "html");
-  assert.deepEqual(calls, [1000, "first", 1000, "second"]);
+  assert.equal(REQUEST_INTERVAL_MS, 3000);
+  assert.deepEqual(calls, [3000, "first", 3000, "second"]);
 });
 
 test("fetch-matchups: HTTP失敗はページ内容として扱わない", async () => {

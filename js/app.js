@@ -1,6 +1,8 @@
 import { SSBU_DRILLS } from "./presets/ssbu-drills.js";
 import { GENERIC_DRILLS } from "./drills-generic.js";
 import { MATCHUP_REFERENCE } from "./presets/matchup-reference.js";
+import { referenceView, isNativePlatform } from "./reference-display.js";
+import { SHIRATSUKI_URL, PRIVACY_POLICY_URL } from "./external-links.js";
 import {
   LOSS_TAGS,
   loadState,
@@ -26,6 +28,7 @@ import { el, clear, svgEl } from "./dom.js";
 
 const TABS = ["home", "log", "matchup", "settings"];
 const TAB_LABELS = { home: "ホーム", log: "記録", matchup: "相性", settings: "設定" };
+const APP_VERSION = "1.0"; // ios/App の MARKETING_VERSION と合わせる
 
 let state = loadState();
 let currentTab = "home";
@@ -204,16 +207,24 @@ function renderHome() {
   ]);
 
   const refData = referenceDataFor(my);
-  const refNoteSection = refData
+  const refView = referenceView(my, refData, { isNative: isNativePlatform() });
+  const refNoteSection = !refView
+    ? null
+    : refView.mode === "link"
     ? el("div", { className: "card" }, [
+        el("h2", {}, "一般的な相性の目安"),
+        el("p", { className: "hint" }, refView.texts.linkGuide),
+        externalLink(refView.url, refView.texts.linkButton, "ref-link-btn"),
+      ])
+    : el("div", { className: "card" }, [
         el("h2", {}, "一般的な相性の目安"),
         el(
           "p",
           { className: "hint" },
-          `${my}は得意${refData.good.length}キャラ・苦手${refData.bad.length}キャラの目安データがあります。「相性」タブで詳しく見られます。`
+          `${my}は得意${refData.good.length}キャラ・苦手${refData.bad.length}キャラの目安データ（シラツキ理論の相性表の抜粋）があります。「相性」タブで詳しく見られます。`
         ),
-      ])
-    : null;
+        el("p", { className: "ref-matchup-sources" }, [externalLink(refView.url, refView.texts.sourceLink)]),
+      ]);
 
   const recent10 = recentWinRate(myMatches, 10);
   const overall = winRate(myMatches);
@@ -450,32 +461,31 @@ function renderReferenceColumn(title, className, list, myFighterStats) {
   ]);
 }
 
+/** 外部リンク。タップしたときだけブラウザ（iOSアプリでは Safari）で開く。 */
+function externalLink(href, text, className) {
+  return el("a", { href, target: "_blank", rel: "noopener noreferrer", className }, text);
+}
+
 function renderReferenceCard(my, myMatches) {
   const ref = referenceDataFor(my);
-  if (!ref) return null;
+  const view = referenceView(my, ref, { isNative: isNativePlatform() });
+  if (!view) return null;
+  if (view.mode === "link") {
+    return el("div", { className: "card" }, [
+      el("h2", {}, "一般的な相性の目安"),
+      el("p", {}, view.texts.linkGuide),
+      externalLink(view.url, view.texts.linkButton, "ref-link-btn"),
+    ]);
+  }
   const myFighterStats = matchupStats(myMatches, my);
   return el("div", { className: "card" }, [
     el("h2", {}, "一般的な相性の目安"),
-    el(
-      "p",
-      { className: "hint" },
-      "スマメイト(オンライン対戦)の統計に基づく目安です。腕前で変わります。あなた自身の対戦ログがあれば横に表示します。"
-    ),
+    el("p", { className: "hint" }, view.texts.description),
     el("div", { className: "ref-matchup-columns" }, [
       renderReferenceColumn("得意な相手", "good", ref.good, myFighterStats),
       renderReferenceColumn("苦手な相手", "bad", ref.bad, myFighterStats),
     ]),
-    el(
-      "p",
-      { className: "ref-matchup-sources" },
-      [
-        "出典: ",
-        ...ref.sources.flatMap((url, i) => [
-          i > 0 ? "、" : null,
-          el("a", { href: url, target: "_blank", rel: "noopener noreferrer" }, url),
-        ]),
-      ].filter((x) => x !== null)
-    ),
+    el("p", { className: "ref-matchup-sources" }, [externalLink(view.url, view.texts.sourceLink)]),
   ]);
 }
 
@@ -618,7 +628,12 @@ function renderMatchupEditor(gameId, my, opponent) {
 
 // ---------- 設定 ----------
 function renderSettings() {
-  return el("section", { className: "panel" }, [renderGameSection(), renderFighterSection(), renderDataSection()]);
+  return el("section", { className: "panel" }, [
+    renderGameSection(),
+    renderFighterSection(),
+    renderDataSection(),
+    renderAboutSection(),
+  ]);
 }
 
 function renderGameSection() {
@@ -784,7 +799,7 @@ function renderDataSection() {
       "JSONエクスポート"
     ),
     el("label", { className: "file-label" }, [
-      "JSONインポート",
+      "JSONインポート（ファイルを選ぶ）",
       el("input", { type: "file", accept: "application/json", onChange: onImportFile }),
     ]),
     el(
@@ -792,6 +807,25 @@ function renderDataSection() {
       { type: "button", className: "danger-btn", onClick: onEraseAll },
       "全データを消去"
     ),
+  ]);
+}
+
+function renderAboutSection() {
+  return el("div", { className: "card about-card" }, [
+    el("h2", {}, "このアプリについて"),
+    el(
+      "p",
+      {},
+      "本アプリは個人が制作した非公式のファンツールで、任天堂株式会社および各キャラクターの権利者とは一切関係がなく、承認・提携を受けたものではありません。ゲームの画像・ロゴ・音声は使用していません。記載の名称は各社の商標または登録商標です。"
+    ),
+    el("h3", {}, "相性データの出典"),
+    el("p", {}, [externalLink(SHIRATSUKI_URL, "シラツキ理論"), "（スマメイト第21期の統計・2026-09-23取得）"]),
+    el("h3", {}, "プライバシー"),
+    el("p", {}, [
+      "記録はこの端末の中だけに保存され、外部に送信されません。",
+      externalLink(PRIVACY_POLICY_URL, "プライバシーポリシー"),
+    ]),
+    el("p", { className: "hint" }, `バージョン ${APP_VERSION}`),
   ]);
 }
 

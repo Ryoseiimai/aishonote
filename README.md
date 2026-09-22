@@ -26,8 +26,13 @@ python3 -m http.server 8000
 
 Node.js 22以降で `node scripts/fetch-matchups.mjs` を実行すると、
 [シラツキ理論](https://ssbu-shiratsuki-theory.net/chara_link.html)のキャラ一覧と各相性ページを
-User-Agent付き・直列・リクエスト間1秒以上で取得し、`js/presets/matchup-reference.js` を上書きします。
+連絡先入りのUser-Agent付き・直列・リクエスト間3秒で取得し、`js/presets/matchup-reference.js` を上書きします。
 ブラウザでは同梱データのみを表示し、外部サイトへの自動アクセスは行いません。
+取得スクリプトはレート戦の期が更新されたときだけ手動で実行する。CIや定期実行には組み込まない。
+
+Web版は同梱データ（相性表の抜粋）を表示します。iOSアプリ版は出典の運営者の許諾が取れるまで同梱データを表示せず、
+出典の相性表ページへのリンク（タップしたときだけSafariで開く）だけを出します（`js/reference-display.js` の
+`EMBED_REFERENCE_ON_NATIVE`）。
 
 出典の最新掲載はスマメイト21期です（現在のレート戦期間とは限りません）。公開されているのは、
 レート等を調整した1先の**勝率帯と相性順**で、個別の勝率や対戦数ではありません。
@@ -67,6 +72,18 @@ User-Agent付き・直列・リクエスト間1秒以上で取得し、`js/prese
 キャラクター名はテキストのみを使用しており、任天堂の公式画像・音源・ロゴは一切同梱していません。
 任天堂株式会社および関連企業とは無関係です。
 
+## プライバシーポリシー
+
+- 記録（対戦ログ・相性表・メモ・設定）はお使いの端末（ブラウザの localStorage／iOSアプリ内の保存領域）の中だけに保存され、外部に送信されません。
+- 氏名・メールアドレス・位置情報・利用状況などの個人情報は一切収集しません。アクセス解析・広告・トラッキングもありません。
+- アプリが外部サーバーと通信することはありません。相性表の出典などの外部リンクは、タップしたときだけブラウザ（iOSではSafari）で開きます。
+- データを第三者へ提供・共有することはありません。
+- お問い合わせ: [GitHub Issues](https://github.com/Ryoseiimai/aishonote/issues)
+
+詳細は [`docs/privacy.md`](docs/privacy.md) を参照してください。
+
 ## ライセンス
 
 MIT License（`LICENSE`参照）
+
+`js/presets/matchup-reference.js` の相性データはMITライセンスの対象外で、権利は出典（シラツキ理論）に帰属します。

@@ -2,6 +2,9 @@
 # 使い方: python3 store/shot.py  （リポジトリ直下を自前の一時HTTPサーバーで配信して撮る）
 # iPhone相当の 430x932 CSS px を 3倍で撮る＝1290x2796。レンダラは iOS と同系の WebKit。
 # ビューポート撮影（fullPage ではない）。固定の下タブがカードを中途半端に切らないよう各画面でスクロール位置を調整する。
+# App Store 用は iOS アプリの見た目で撮るため window.Capacitor.isNativePlatform() を true にする（相性の目安はリンク案内になる）。
+# python3 store/shot.py --web-matchup OUT.png で、Web版（同梱データ表示）の相性タブを1枚だけ別に撮れる。
+import argparse
 import functools
 import http.server
 import os
@@ -114,27 +117,39 @@ def click_tab(page, label):
     page.evaluate("window.scrollTo(0, 0)")
 
 
-def scroll_card_to_top(page, heading):
-    """見出し heading で始まるカードの上端が画面上部に来るようスクロールする。"""
+NATIVE_INIT = "window.Capacitor = { isNativePlatform: () => true };"
+
+
+def scroll_bottom_to(page, selector, gap=16):
+    """selector の要素の下端が下タブの上端から gap px 上に来るようスクロールする。"""
     page.evaluate(
-        """(t) => {
-          const h = [...document.querySelectorAll('.card h2')].find(x => x.textContent.startsWith(t));
-          if (!h) return;
-          // ページ末尾でスクロールが止まらないよう、撮影時だけ本文の下に空白を足す（画面下部は元々空白なので見た目は同じ）
-          if (!document.getElementById('shot-spacer')) {
-            const sp = document.createElement('div');
-            sp.id = 'shot-spacer';
-            sp.style.height = window.innerHeight + 'px';
-            document.getElementById('app').appendChild(sp);
-          }
-          const card = h.closest('.card');
-          const prev = card.previousElementSibling;
-          // 前のカードの下端が1pxも見えない位置（=カード間の余白から始まる位置）まで送る
-          const y = prev ? prev.getBoundingClientRect().bottom + 1 : card.getBoundingClientRect().top - 12;
-          window.scrollTo(0, window.scrollY + y);
+        """([sel, gap]) => {
+          const node = document.querySelector(sel);
+          const navTop = document.querySelector('nav.bottom-nav').getBoundingClientRect().top;
+          window.scrollTo(0, window.scrollY + node.getBoundingClientRect().bottom - (navTop - gap));
         }""",
-        heading,
+        [selector, gap],
     )
+
+
+def open_app(browser, url, native):
+    ctx = browser.new_context(
+        viewport={"width": CSS_W, "height": CSS_H},
+        device_scale_factor=SCALE,
+        color_scheme="light",
+        locale="ja-JP",
+    )
+    if native:
+        ctx.add_init_script(NATIVE_INIT)
+    page = ctx.new_page()
+    errors = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.goto(url)
+    page.evaluate("(s) => window.localStorage.setItem('aishonote.v1', JSON.stringify(s))", build_state())
+    page.reload()
+    page.wait_for_selector("nav.bottom-nav")
+    page.wait_for_timeout(300)
+    return page, errors
 
 
 def shot(page, name):
@@ -145,59 +160,52 @@ def shot(page, name):
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--web-matchup", help="Web版（注入なし）の相性タブだけをこのパスに撮る")
+    args = ap.parse_args()
+
     srv, url = start_server()
     out = []
     try:
         with sync_playwright() as p:
             browser = p.webkit.launch()
-            ctx = browser.new_context(
-                viewport={"width": CSS_W, "height": CSS_H},
-                device_scale_factor=SCALE,
-                color_scheme="light",
-                locale="ja-JP",
-            )
-            page = ctx.new_page()
-            errors = []
-            page.on("pageerror", lambda e: errors.append(str(e)))
-            page.goto(url)
-            page.evaluate(
-                "(s) => window.localStorage.setItem('aishonote.v1', JSON.stringify(s))", build_state()
-            )
-            page.reload()
-            page.wait_for_selector("nav.bottom-nav")
-            page.wait_for_timeout(300)
+            if args.web_matchup:
+                page, errors = open_app(browser, url, native=False)
+                click_tab(page, "相性")
+                page.wait_for_selector(".ref-matchup-columns")
+                page.wait_for_timeout(200)
+                page.screenshot(path=args.web_matchup)
+                out.append(args.web_matchup)
+            else:
+                page, errors = open_app(browser, url, native=True)
 
-            # 01 ホーム（次に潰す相性・相性の目安・勝率サマリー・上達グラフを1画面に）
-            scroll_card_to_top(page, "次に潰す相性")
-            out.append(shot(page, "01_home.png"))
+                # 01 ホーム（ヘッダーから見える一番上の位置）
+                page.evaluate("window.scrollTo(0, 0)")
+                out.append(shot(page, "01_home.png"))
 
-            # 02 記録（負け理由のタグが見える状態）
-            click_tab(page, "記録")
-            page.locator(".log-form select").nth(1).select_option("パックマン")
-            page.check("input[type=radio][value=lose]")
-            page.wait_for_timeout(200)
-            page.check("label.tag-checkbox:has-text('復帰阻止された') input")
-            page.check("label.tag-checkbox:has-text('飛び道具に触れない') input")
-            page.wait_for_timeout(200)
-            out.append(shot(page, "02_log.png"))
+                # 02 記録（負け理由のタグが見える状態）
+                click_tab(page, "記録")
+                page.locator(".log-form select").nth(1).select_option("パックマン")
+                page.check("input[type=radio][value=lose]")
+                page.wait_for_timeout(200)
+                page.check("label.tag-checkbox:has-text('復帰阻止された') input")
+                page.check("label.tag-checkbox:has-text('飛び道具に触れない') input")
+                page.wait_for_timeout(200)
+                out.append(shot(page, "02_log.png"))
 
-            # 03 相性（一般的な相性の目安カードを最上部に大きく）
-            click_tab(page, "相性")
-            page.wait_for_selector(".card:has(h2:text('一般的な相性の目安'))")
-            out.append(shot(page, "03_matchup.png"))
+                # 03 相性（出典へのリンク案内カード＋自分の相性表）
+                click_tab(page, "相性")
+                page.wait_for_selector("a.ref-link-btn")
+                assert page.locator(".ref-matchup-columns").count() == 0, "iOS表示で同梱データが出ている"
+                out.append(shot(page, "03_matchup.png"))
 
-            # 04 設定（マイキャラ設定を画面上部に）
-            click_tab(page, "設定")
-            scroll_card_to_top(page, "マイキャラ設定")
-            # キャラ一覧（内側スクロール）をネスが見える位置へ
-            page.evaluate(
-                """() => {
-                  const list = document.querySelector('.fighter-checklist');
-                  const row = [...list.querySelectorAll('.fighter-checkbox')].find(r => r.textContent.trim() === 'ネス');
-                  if (row) list.scrollTop = row.offsetTop - list.offsetTop - 4 * row.offsetHeight;
-                }"""
-            )
-            out.append(shot(page, "04_settings.png"))
+                # 04 設定（データカード＋「このアプリについて」カード。about の下端を下タブの少し上に揃える）
+                click_tab(page, "設定")
+                scroll_bottom_to(page, ".about-card")
+                assert page.evaluate(
+                    "() => getComputedStyle(document.querySelector('.file-label input')).opacity"
+                ) == "0", "英語の Choose File が見えている"
+                out.append(shot(page, "04_settings.png"))
 
             browser.close()
             if errors:
