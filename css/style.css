@@ -781,3 +781,9 @@ body::before {
   padding-left: 20px;
   color: var(--muted);
 }
+
+.character-menu-sources {
+  margin-top: 12px;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}

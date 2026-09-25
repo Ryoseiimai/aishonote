@@ -62,7 +62,7 @@ export function emptyState() {
     activeFighterByGame: { [DEFAULT_GAME_ID]: null },
     matches: [],
     matchups: {},
-    progress: [], // 上達ロードマップでチェック済みの項目id
+    progress: [], // 上達ロードマップ・キャラ専用メニューでチェック済みの項目id
     practiceLog: {}, // 日付(YYYY-MM-DD) -> その日の練習分数
   };
 }

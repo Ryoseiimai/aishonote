@@ -5,6 +5,7 @@ import { referenceView, isNativePlatform, aboutSourceView, EMBED_REFERENCE_ON_NA
 import { showAlert, showConfirm } from "./dialog.js";
 import { SHIRATSUKI_URL, PRIVACY_POLICY_URL } from "./external-links.js";
 import { SSBU_CURRICULUM } from "./presets/ssbu-curriculum.js";
+import { characterMenuView } from "./char-curriculum-display.js";
 import {
   stageRate,
   overallRate,
@@ -537,15 +538,30 @@ function renderRoadmap() {
 function renderCharacterMenu() {
   const my = state.activeFighterByGame[state.activeGameId];
   const progressSet = new Set(state.progress);
-  const body =
-    my === "ネス"
-      ? el(
+  const menu = characterMenuView(state.activeGameId, my, progressSet);
+  const body = menu
+    ? [
+        el("div", { className: `progress-bar progress-w-${roundRateToStep(menu.rate)}` }, [
+          el("div", { className: "progress-fill" }),
+        ]),
+        el("p", { className: "hint" }, `キャラ専用メニューの達成率 ${Math.round(menu.rate * 100)}%`),
+        el(
           "ul",
           { className: "roadmap-items" },
-          SSBU_CURRICULUM.ness.map((item) => renderRoadmapItem(item, progressSet))
-        )
-      : el("p", { className: "hint" }, "このキャラ専用メニューは準備中です。");
-  return el("div", { className: "card" }, [el("h2", {}, `キャラ専用メニュー${my ? `（${my}）` : ""}`), body]);
+          menu.items.map((item) => renderRoadmapItem(item, progressSet))
+        ),
+        el("div", { className: "character-menu-sources" }, [
+          el("p", { className: "hint" }, "このキャラの出典"),
+          el("ul", { className: "sources-list" }, menu.sources.map((source) =>
+            el("li", {}, [externalLink(source.url, source.title)])
+          )),
+        ]),
+      ]
+    : [el("p", { className: "hint" }, "このキャラ専用メニューは準備中です。")];
+  return el("div", { className: "card character-menu" }, [
+    el("h2", {}, `キャラ専用メニュー${my ? `（${my}）` : ""}`),
+    ...body,
+  ]);
 }
 
 function renderGlossary() {
