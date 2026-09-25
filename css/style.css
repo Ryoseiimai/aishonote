@@ -460,7 +460,7 @@ input[type="search"] {
   left: 0;
   right: 0;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   background: var(--card-bg);
   border-top: 1px solid var(--border);
   max-width: 480px;
@@ -625,4 +625,159 @@ body::before {
 
 .dialog-box:focus {
   outline: none;
+}
+
+
+/* ---------- 上達タブ ---------- */
+.duration-buttons {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.duration-buttons .secondary-btn {
+  flex: 1;
+}
+
+.duration-buttons .secondary-btn.selected {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: bold;
+}
+
+.practice-steps {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+}
+
+.practice-step {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.practice-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 12px 0;
+}
+
+.practice-timer {
+  font-size: 28px;
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+  min-width: 84px;
+}
+
+.roadmap-stage {
+  margin-top: 12px;
+}
+
+.roadmap-stage summary {
+  font-weight: bold;
+  cursor: pointer;
+  padding: 8px 0;
+}
+
+.roadmap-items {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.roadmap-item {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.roadmap-item-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.roadmap-item-title {
+  font-weight: bold;
+}
+
+.next-step-title {
+  font-size: 17px;
+  font-weight: bold;
+}
+
+/* 達成率バー。CPU計算した割合を10%刻みのクラス名に丸めてCSSだけで幅を出す(インラインstyle属性を使わないため)。 */
+.progress-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--border);
+  overflow: hidden;
+  margin: 8px 0;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--accent);
+}
+
+.progress-w-0 .progress-fill { width: 0%; }
+.progress-w-10 .progress-fill { width: 10%; }
+.progress-w-20 .progress-fill { width: 20%; }
+.progress-w-30 .progress-fill { width: 30%; }
+.progress-w-40 .progress-fill { width: 40%; }
+.progress-w-50 .progress-fill { width: 50%; }
+.progress-w-60 .progress-fill { width: 60%; }
+.progress-w-70 .progress-fill { width: 70%; }
+.progress-w-80 .progress-fill { width: 80%; }
+.progress-w-90 .progress-fill { width: 90%; }
+.progress-w-100 .progress-fill { width: 100%; }
+
+.glossary-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.glossary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.glossary-term {
+  font-weight: bold;
+}
+
+.glossary-desc {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.review-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.review-list li {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.review-list h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+}
+
+.sources-card {
+  font-size: 13px;
+}
+
+.sources-list {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  color: var(--muted);
 }

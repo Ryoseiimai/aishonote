@@ -265,3 +265,34 @@ test("validateImport: gameIdに__proto__/constructor/prototypeを含むmyFighter
   assert.equal(Object.getPrototypeOf(r.data.myFightersByGame), null);
   assert.equal(Object.getPrototypeOf(r.data.activeFighterByGame), null);
 });
+
+test("validateImport: progress/practiceLogが無い旧データも既定値で補完される", () => {
+  const r = validateImport(validBase());
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.data.progress, []);
+  assert.deepEqual(r.data.practiceLog, {});
+});
+
+test("validateImport: progressは文字列配列のみ残し、重複や長すぎるidは除去する", () => {
+  const data = validBase();
+  data.progress = ["op-short-hop", "op-short-hop", 123, "a".repeat(101), "b".repeat(100)];
+  const r = validateImport(data);
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.data.progress, ["op-short-hop", "b".repeat(100)]);
+});
+
+test("validateImport: practiceLogは日付キー・0〜1440の数値のみ残す", () => {
+  const data = validBase();
+  data.practiceLog = {
+    "2026-09-25": 30,
+    "2026-09-26": 30.6,
+    "not-a-date": 10,
+    "2026-09-27": -5,
+    "2026-09-28": 2000,
+    __proto__: { hacked: true },
+  };
+  const r = validateImport(data);
+  assert.equal(r.ok, true);
+  assert.deepEqual({ ...r.data.practiceLog }, { "2026-09-25": 30, "2026-09-26": 31 });
+  assert.equal(Object.getPrototypeOf(r.data.practiceLog), null);
+});

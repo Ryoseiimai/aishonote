@@ -4,6 +4,15 @@ import { MATCHUP_LINKS } from "./presets/matchup-links.js";
 import { referenceView, isNativePlatform, aboutSourceView, EMBED_REFERENCE_ON_NATIVE } from "./reference-display.js";
 import { showAlert, showConfirm } from "./dialog.js";
 import { SHIRATSUKI_URL, PRIVACY_POLICY_URL } from "./external-links.js";
+import { SSBU_CURRICULUM } from "./presets/ssbu-curriculum.js";
+import {
+  stageRate,
+  overallRate,
+  nextStep,
+  roundRateToStep,
+  practiceStreak,
+  weeklyMinutes,
+} from "./curriculum-stats.js";
 import {
   LOSS_TAGS,
   loadState,
@@ -27,8 +36,8 @@ import {
 } from "./stats.js";
 import { el, clear, svgEl } from "./dom.js";
 
-const TABS = ["home", "log", "matchup", "settings"];
-const TAB_LABELS = { home: "ホーム", log: "記録", matchup: "相性", settings: "設定" };
+const TABS = ["home", "log", "growth", "matchup", "settings"];
+const TAB_LABELS = { home: "ホーム", log: "記録", growth: "上達", matchup: "相性", settings: "設定" };
 const APP_VERSION = "1.0"; // ios/App の MARKETING_VERSION と合わせる
 
 let state = loadState();
@@ -38,6 +47,14 @@ let matchupSelected = null; // 相性タブで編集中の相手キャラ
 let fighterFilter = "";
 let newGameNameDraft = "";
 let newFighterNameDraft = "";
+
+// ---------- 上達タブ: 今日の練習タイマー(永続化しない画面内だけの状態) ----------
+let growthDuration = null; // 10 | 30 | 60 | null
+let growthRunning = false;
+let growthRemainingSec = 0;
+let growthTimerId = null;
+let growthStepChecks = []; // ステップごとのチェック(表示用。記録は分数だけ)
+let termQuery = ""; // 用語辞典の検索語
 
 const root = document.getElementById("app");
 
@@ -174,7 +191,11 @@ function renderHome() {
   const my = state.activeFighterByGame[gameId];
   if (!my) {
     return el("section", { className: "panel" }, [
-      el("p", {}, "まず「設定」タブでマイキャラを選び、自キャラを切り替えてください。"),
+      renderNextStepCard(),
+      renderPracticeStatusCard(),
+      el("div", { className: "card" }, [
+        el("p", {}, "まず「設定」タブでマイキャラを選び、自キャラを切り替えてください。"),
+      ]),
     ]);
   }
   const myMatches = state.matches.filter((m) => m.gameId === gameId && m.my === my);
@@ -263,7 +284,38 @@ function renderHome() {
     renderWeeklyGraph(weekly),
   ]);
 
-  return el("section", { className: "panel" }, [homeworkSection, weakSection, refNoteSection, summarySection, graphSection]);
+  return el("section", { className: "panel" }, [
+    renderNextStepCard(),
+    renderPracticeStatusCard(),
+    homeworkSection,
+    weakSection,
+    refNoteSection,
+    summarySection,
+    graphSection,
+  ]);
+}
+
+// ---------- ホームの小カード(上達ロードマップの次の一歩・今日の練習状況) ----------
+function renderNextStepCard() {
+  const step = nextStep(SSBU_CURRICULUM.roadmap, new Set(state.progress));
+  return el("div", { className: "card" }, [
+    el("h2", {}, "次の一歩"),
+    step
+      ? el("div", {}, [
+          el("p", { className: "next-step-title" }, step.item.title),
+          el("p", { className: "hint" }, `段階: ${step.stageTitle}`),
+        ])
+      : el("p", { className: "hint" }, "ロードマップの全項目を達成しています。"),
+  ]);
+}
+
+function renderPracticeStatusCard() {
+  const today = todayStr();
+  const todayMinutes = state.practiceLog[today] || 0;
+  return el("div", { className: "card summary-grid" }, [
+    summaryBox("今日の練習", `${todayMinutes}分`),
+    summaryBox("連続日数", `${practiceStreak(state.practiceLog, today)}日`),
+  ]);
 }
 
 function summaryBox(label, value) {
@@ -301,6 +353,278 @@ function renderWeeklyGraph(weekly) {
     ]
   );
   return svg;
+}
+
+// ---------- 上達 ----------
+function routineFor(minutes) {
+  return SSBU_CURRICULUM.routines.find((r) => r.minutes === minutes) || null;
+}
+
+function stopGrowthTimer() {
+  if (growthTimerId !== null) {
+    clearInterval(growthTimerId);
+    growthTimerId = null;
+  }
+  growthRunning = false;
+}
+
+function selectGrowthDuration(minutes) {
+  stopGrowthTimer();
+  growthDuration = minutes;
+  const routine = routineFor(minutes);
+  growthStepChecks = routine ? routine.steps.map(() => false) : [];
+  growthRemainingSec = minutes * 60;
+  renderApp();
+}
+
+function startGrowthTimer() {
+  if (!growthDuration || growthRunning) return;
+  if (growthRemainingSec <= 0) growthRemainingSec = growthDuration * 60;
+  growthRunning = true;
+  growthTimerId = setInterval(() => {
+    growthRemainingSec -= 1;
+    if (growthRemainingSec <= 0) {
+      growthRemainingSec = 0;
+      completeGrowthSession();
+      return;
+    }
+    renderApp();
+  }, 1000);
+  renderApp();
+}
+
+function pauseGrowthTimer() {
+  stopGrowthTimer();
+  renderApp();
+}
+
+/** 今日の練習を完了として記録する(タイマーが0になったとき、または手動で完了ボタンを押したとき)。 */
+function completeGrowthSession() {
+  stopGrowthTimer();
+  if (!growthDuration) return;
+  const today = todayStr();
+  const practiceLog = { ...state.practiceLog, [today]: (state.practiceLog[today] || 0) + growthDuration };
+  growthDuration = null;
+  growthRemainingSec = 0;
+  growthStepChecks = [];
+  setState({ practiceLog });
+}
+
+function formatMMSS(totalSeconds) {
+  const mm = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
+  const ss = String(totalSeconds % 60).padStart(2, "0");
+  return `${mm}:${ss}`;
+}
+
+function renderTodayPractice() {
+  const routine = growthDuration ? routineFor(growthDuration) : null;
+
+  const durationButtons = el(
+    "div",
+    { className: "duration-buttons" },
+    SSBU_CURRICULUM.routines.map((r) =>
+      el(
+        "button",
+        {
+          type: "button",
+          className: `secondary-btn${growthDuration === r.minutes ? " selected" : ""}`,
+          onClick: () => selectGrowthDuration(r.minutes),
+        },
+        `${r.minutes}分`
+      )
+    )
+  );
+
+  const stepsList = routine
+    ? el(
+        "ul",
+        { className: "practice-steps" },
+        routine.steps.map((step, i) =>
+          el("li", { className: "practice-step" }, [
+            el("label", { className: "roadmap-item-label" }, [
+              el("input", {
+                type: "checkbox",
+                checked: growthStepChecks[i] || false,
+                onChange: () => {
+                  growthStepChecks = growthStepChecks.map((c, idx) => (idx === i ? !c : c));
+                  renderApp();
+                },
+              }),
+              el("span", {}, `${step.title}（${step.minutes}分）`),
+            ]),
+            el("p", { className: "hint" }, step.how),
+          ])
+        )
+      )
+    : null;
+
+  const controls = growthDuration
+    ? el("div", { className: "practice-controls" }, [
+        el("div", { className: "practice-timer" }, formatMMSS(growthRemainingSec)),
+        growthRunning
+          ? el("button", { type: "button", className: "secondary-btn", onClick: pauseGrowthTimer }, "一時停止")
+          : el("button", { type: "button", className: "primary-btn", onClick: startGrowthTimer }, "スタート"),
+        el(
+          "button",
+          { type: "button", className: "secondary-btn", onClick: completeGrowthSession },
+          "今日完了として記録"
+        ),
+      ])
+    : null;
+
+  const today = todayStr();
+  return el("div", { className: "card" }, [
+    el("h2", {}, "今日の練習"),
+    el("p", { className: "hint" }, "時間を選んでステップを確認しながら練習し、終わったら記録しましょう。"),
+    durationButtons,
+    stepsList,
+    controls,
+    el("div", { className: "summary-grid" }, [
+      summaryBox("連続日数", `${practiceStreak(state.practiceLog, today)}日`),
+      summaryBox("今週の合計", `${weeklyMinutes(state.practiceLog, today)}分`),
+    ]),
+  ]);
+}
+
+function renderRoadmapItem(item, progressSet) {
+  const checked = progressSet.has(item.id);
+  return el("li", { className: "roadmap-item" }, [
+    el("label", { className: "roadmap-item-label" }, [
+      el("input", { type: "checkbox", checked, onChange: () => toggleProgress(item.id) }),
+      el("span", { className: "roadmap-item-title" }, item.title),
+    ]),
+    el("p", { className: "hint" }, item.desc),
+    el("p", { className: "hint" }, `合格の目安: ${item.check}`),
+  ]);
+}
+
+function toggleProgress(id) {
+  const set = new Set(state.progress);
+  if (set.has(id)) set.delete(id);
+  else set.add(id);
+  setState({ progress: [...set] });
+}
+
+function renderRoadmapStage(stage, progressSet) {
+  const rate = stageRate(stage, progressSet);
+  return el("details", { className: "roadmap-stage" }, [
+    el("summary", {}, `${stage.title}（${Math.round(rate * 100)}%）`),
+    el("p", { className: "hint" }, stage.goal),
+    el("div", { className: `progress-bar progress-w-${roundRateToStep(rate)}` }, [
+      el("div", { className: "progress-fill" }),
+    ]),
+    el(
+      "ul",
+      { className: "roadmap-items" },
+      stage.items.map((item) => renderRoadmapItem(item, progressSet))
+    ),
+  ]);
+}
+
+function renderRoadmap() {
+  const progressSet = new Set(state.progress);
+  const overall = overallRate(SSBU_CURRICULUM.roadmap, progressSet);
+  return el("div", { className: "card" }, [
+    el("h2", {}, "上達ロードマップ"),
+    el("div", { className: `progress-bar progress-w-${roundRateToStep(overall)}` }, [
+      el("div", { className: "progress-fill" }),
+    ]),
+    el("p", { className: "hint" }, `全体の達成率 ${Math.round(overall * 100)}%`),
+    ...SSBU_CURRICULUM.roadmap.map((stage) => renderRoadmapStage(stage, progressSet)),
+  ]);
+}
+
+function renderCharacterMenu() {
+  const my = state.activeFighterByGame[state.activeGameId];
+  const progressSet = new Set(state.progress);
+  const body =
+    my === "ネス"
+      ? el(
+          "ul",
+          { className: "roadmap-items" },
+          SSBU_CURRICULUM.ness.map((item) => renderRoadmapItem(item, progressSet))
+        )
+      : el("p", { className: "hint" }, "このキャラ専用メニューは準備中です。");
+  return el("div", { className: "card" }, [el("h2", {}, `キャラ専用メニュー${my ? `（${my}）` : ""}`), body]);
+}
+
+function renderGlossary() {
+  const q = termQuery.trim();
+  const filtered = SSBU_CURRICULUM.glossary.filter((g) => !q || g.term.includes(q) || g.desc.includes(q));
+  return el("div", { className: "card" }, [
+    el("h2", {}, "用語辞典"),
+    el("input", {
+      type: "search",
+      placeholder: "用語で検索",
+      value: termQuery,
+      onInput: (e) => {
+        termQuery = e.target.value;
+        renderApp();
+      },
+    }),
+    el(
+      "ul",
+      { className: "glossary-list" },
+      filtered.map((g) =>
+        el("li", { className: "glossary-item" }, [
+          el("span", { className: "glossary-term" }, g.term),
+          el("span", { className: "glossary-desc" }, g.desc),
+        ])
+      )
+    ),
+    filtered.length === 0 ? el("p", { className: "hint" }, "該当する用語がありません。") : null,
+  ]);
+}
+
+function renderReviewAndMental() {
+  return el("details", { className: "card" }, [
+    el("summary", {}, "振り返り・メンタル"),
+    el(
+      "ul",
+      { className: "review-list" },
+      SSBU_CURRICULUM.review.map((r) => el("li", {}, [el("h3", {}, r.title), el("p", { className: "hint" }, r.desc)]))
+    ),
+  ]);
+}
+
+function renderRecommendedSettings() {
+  return el("details", { className: "card" }, [
+    el("summary", {}, "おすすめ設定"),
+    el(
+      "ul",
+      { className: "review-list" },
+      SSBU_CURRICULUM.settings.map((s) =>
+        el("li", {}, [
+          el("h3", {}, s.title),
+          el("p", { className: "hint" }, s.desc),
+          externalLink(s.source, "出典を見る", "settings-tip-source"),
+        ])
+      )
+    ),
+  ]);
+}
+
+function renderCurriculumSources() {
+  return el("div", { className: "card sources-card" }, [
+    el("h2", {}, "出典"),
+    el(
+      "ul",
+      { className: "sources-list" },
+      SSBU_CURRICULUM.sources.map((s) => el("li", {}, [externalLink(s.url, s.title)]))
+    ),
+  ]);
+}
+
+function renderGrowth() {
+  return el("section", { className: "panel" }, [
+    renderTodayPractice(),
+    renderRoadmap(),
+    renderCharacterMenu(),
+    renderGlossary(),
+    renderReviewAndMental(),
+    renderRecommendedSettings(),
+    renderCurriculumSources(),
+  ]);
 }
 
 // ---------- 記録 ----------
@@ -929,6 +1253,8 @@ async function onEraseAll() {
     activeFighterByGame: { [DEFAULT_GAME_ID]: null },
     matches: [],
     matchups: {},
+    progress: [],
+    practiceLog: {},
   };
   persist();
   matchupSelected = null;
@@ -944,6 +1270,8 @@ function renderApp() {
       ? renderHome()
       : currentTab === "log"
       ? renderLog()
+      : currentTab === "growth"
+      ? renderGrowth()
       : currentTab === "matchup"
       ? renderMatchup()
       : renderSettings();

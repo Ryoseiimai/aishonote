@@ -10,6 +10,8 @@ export const MAX_ARRAY_LEN = 10000;
 export const MAX_STRING_LEN = 500;
 export const MAX_NAME_LEN = 50;
 export const DEFAULT_GAME_ID = "ssbu";
+export const MAX_PROGRESS_ID_LEN = 100;
+export const MAX_PRACTICE_MINUTES_PER_DAY = 1440; // 1日24時間分が上限
 
 // プロトタイプ汚染対策: インポートJSON由来のキーでブラケット代入する際に必ず通すガード。
 const UNSAFE_KEYS = new Set(["__proto__", "constructor", "prototype"]);
@@ -60,6 +62,8 @@ export function emptyState() {
     activeFighterByGame: { [DEFAULT_GAME_ID]: null },
     matches: [],
     matchups: {},
+    progress: [], // 上達ロードマップでチェック済みの項目id
+    practiceLog: {}, // 日付(YYYY-MM-DD) -> その日の練習分数
   };
 }
 
@@ -165,6 +169,36 @@ function sanitizeGames(rawGames, errors) {
   return games;
 }
 
+/** 上達ロードマップのチェック済みid配列を検証する。不正な要素は捨て、重複は除去する。 */
+function sanitizeProgress(rawProgress) {
+  if (!Array.isArray(rawProgress)) return [];
+  const capped = rawProgress.slice(0, MAX_ARRAY_LEN);
+  const seen = new Set();
+  const result = [];
+  for (const id of capped) {
+    if (typeof id !== "string" || id.length === 0 || id.length > MAX_PROGRESS_ID_LEN) continue;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    result.push(id);
+  }
+  return result;
+}
+
+/** 日付(YYYY-MM-DD) -> 練習分数(0〜1440の整数) のマップを検証する。不正なキー/値は捨てる。 */
+function sanitizePracticeLog(rawLog) {
+  if (!isPlainObject(rawLog)) return {};
+  const practiceLog = Object.create(null);
+  const entries = Object.entries(rawLog).slice(0, MAX_ARRAY_LEN);
+  for (const [date, minutes] of entries) {
+    if (!isSafeKey(date) || !isValidDate(date)) continue;
+    if (typeof minutes !== "number" || !Number.isFinite(minutes)) continue;
+    const rounded = Math.round(minutes);
+    if (rounded < 0 || rounded > MAX_PRACTICE_MINUTES_PER_DAY) continue;
+    practiceLog[date] = rounded;
+  }
+  return practiceLog;
+}
+
 /**
  * インポートJSONをスキーマ検証する。
  * 戻り値: { ok: boolean, errors: string[], data?: object }
@@ -244,11 +278,16 @@ export function validateImport(raw) {
     }
   }
 
+  // progress/practiceLog は既存データ(このフィールドが無い旧バージョン)との互換のため、
+  // 型がおかしい・欠けている場合はエラーにせず空で補完する(旧データを壊さない)。
+  const progress = sanitizeProgress(raw.progress);
+  const practiceLog = sanitizePracticeLog(raw.practiceLog);
+
   if (errors.length > 0) {
     return { ok: false, errors };
   }
 
-  const data = { version: 2, games, activeGameId, myFightersByGame, activeFighterByGame, matches, matchups };
+  const data = { version: 2, games, activeGameId, myFightersByGame, activeFighterByGame, matches, matchups, progress, practiceLog };
   const size = new TextEncoder().encode(JSON.stringify(data)).length;
   if (size > MAX_BYTES) {
     return { ok: false, errors: [`データサイズが上限(4MB)を超えています`] };

@@ -95,11 +95,13 @@ jobs:
           #   - external-links.js の出典サイトトップ https://ssbu-shiratsuki-theory.net/ と
           #     プライバシーポリシー https://github.com/Ryoseiimai/aishonote/blob/main/docs/privacy.md
           #   - presets/matchup-reference.js・presets/matchup-links.js の相性表ページ https://ssbu-shiratsuki-theory.net/matchup/<slug>.html
+          #   - presets/ssbu-curriculum.js の初心者向け上達カリキュラムの出典URL(sources/settings)。docs/beginner-curriculum.json と同じ固定リスト。
           # いずれも fetch/script/style/font として読み込まれることはなく、外部リンク(rel=noopener noreferrer)の宛先になるだけ。
           if grep -RnoE 'https?://[^"'"'"'`[:space:]]*' js/ index.html \
             | grep -vE '^js/dom\.js:[0-9]+:http://www\.w3\.org/2000/svg$' \
             | grep -vE '^js/external-links\.js:[0-9]+:(https://ssbu-shiratsuki-theory\.net/|https://github\.com/Ryoseiimai/aishonote/blob/main/docs/privacy\.md)$' \
-            | grep -vE '^js/presets/matchup-(reference|links)\.js:[0-9]+:https://ssbu-shiratsuki-theory\.net/matchup/[a-z0-9_]+\.html$'; then
+            | grep -vE '^js/presets/matchup-(reference|links)\.js:[0-9]+:https://ssbu-shiratsuki-theory\.net/matchup/[a-z0-9_]+\.html$' \
+            | grep -vE '^js/presets/ssbu-curriculum\.js:[0-9]+:https://(arutora\.com/17727|altema\.jp/sumaburaswitch/hazikinyuryoku|belliro\.com/sumabura-controller-no2/|gamerch\.com/smashbros/(59596|55948)|forechan\.co\.jp/smashbros/(smashbros-beginner-roadmap/|ness/)|smashlog\.games/(15574|7866|14666)|marutarou\.com/2021/07/27/amabrogakeagarihouhouyonsyuosie/)$'; then
             echo "外部URLが見つかりました。依存/CDN/フォント等の外部参照は禁止です。"
             exit 1
           fi
