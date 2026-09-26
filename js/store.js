@@ -3,6 +3,7 @@
 // データモデルはゲーム非依存: state.games に複数ゲームを持ち、対戦ログ・相性表は gameId で分ける。
 
 import { SSBU_FIGHTERS } from "./presets/ssbu.js";
+import { sanitizeDiagnosis } from "./diagnosis-questions.js";
 
 export const STORAGE_KEY = "aishonote.v1";
 export const MAX_BYTES = 4 * 1024 * 1024; // 4MB
@@ -67,6 +68,7 @@ export function emptyState() {
     practiceLog: {}, // 日付(YYYY-MM-DD) -> その日の練習分数
     birthdayName: "", // 任意のお祝い名。個人名の既定値は持たない
     birthdayDismissedYear: null, // 最後にお祝いを閉じた端末の年
+    diagnosis: null, // キャラ診断の回答 { version, answers, date }。おすすめは回答から毎回計算する
   };
 }
 
@@ -294,12 +296,14 @@ export function validateImport(raw) {
   const birthdayName = isValidBirthdayName(raw.birthdayName) ? raw.birthdayName.trim() : "";
   const birthdayDismissedYear = Number.isInteger(raw.birthdayDismissedYear) &&
     raw.birthdayDismissedYear >= 1 && raw.birthdayDismissedYear <= 9999 ? raw.birthdayDismissedYear : null;
+  // キャラ診断は旧データに無い任意項目。不正なら診断前の状態(null)に戻し、他の記録は失わない。
+  const diagnosis = sanitizeDiagnosis(raw.diagnosis);
 
   if (errors.length > 0) {
     return { ok: false, errors };
   }
 
-  const data = { version: 2, games, activeGameId, myFightersByGame, activeFighterByGame, matches, matchups, progress, practiceLog, birthdayName, birthdayDismissedYear };
+  const data = { version: 2, games, activeGameId, myFightersByGame, activeFighterByGame, matches, matchups, progress, practiceLog, birthdayName, birthdayDismissedYear, diagnosis };
   const size = new TextEncoder().encode(JSON.stringify(data)).length;
   if (size > MAX_BYTES) {
     return { ok: false, errors: [`データサイズが上限(4MB)を超えています`] };
