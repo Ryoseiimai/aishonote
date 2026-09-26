@@ -8,6 +8,8 @@ import { SSBU_CURRICULUM } from "./presets/ssbu-curriculum.js";
 import { characterMenuView } from "./char-curriculum-display.js";
 import { experience } from "./progression.js";
 import { guideCard, pixelIcon, levelNotice } from "./pixel-view.js";
+import { shouldShowBirthday, birthdayDismissalPatch } from "./birthday.js";
+import { showBirthday } from "./birthday-view.js";
 import {
   stageRate,
   overallRate,
@@ -19,14 +21,16 @@ import {
 import {
   LOSS_TAGS,
   loadState,
+  emptyState,
   saveState,
   validateImport,
   fightersOf,
   isValidFighterName,
+  isValidBirthdayName,
+  MAX_BIRTHDAY_NAME_LEN,
   MAX_STRING_LEN,
   MAX_NAME_LEN,
   MAX_PRACTICE_MINUTES_PER_DAY,
-  DEFAULT_GAME_ID,
 } from "./store.js";
 import {
   winRate,
@@ -1019,6 +1023,7 @@ function renderSettings() {
     renderFighterSection(),
     renderDataSection(),
     renderAboutSection(),
+    renderBirthdayNameSection(),
   ]);
 }
 
@@ -1214,6 +1219,40 @@ function renderAboutSection() {
   ]);
 }
 
+function renderBirthdayNameSection() {
+  const status = el("p", { className: "hint", role: "status", "aria-live": "polite" });
+  const input = el("input", {
+    id: "birthday-name", type: "text", maxlength: MAX_BIRTHDAY_NAME_LEN,
+    value: state.birthdayName, "aria-describedby": "birthday-name-hint",
+    autocomplete: "off",
+  });
+  const form = el("form", { className: "inline-form", onSubmit: (event) => {
+    event.preventDefault();
+    if (!isValidBirthdayName(input.value)) {
+      status.textContent = "お祝いの名前は20字までで入力してください。";
+      return;
+    }
+    const birthdayName = input.value.trim();
+    try {
+      if (!saveState({ ...state, birthdayName })) {
+        status.textContent = "保存できませんでした。データの空き容量を確認してください。";
+        return;
+      }
+      state = { ...state, birthdayName };
+      input.value = birthdayName;
+      status.textContent = "保存しました。";
+    } catch {
+      status.textContent = "保存できませんでした。端末の保存設定を確認してください。";
+    }
+  } }, [input, el("button", { type: "submit", className: "secondary-btn" }, "保存")]);
+  return el("div", { className: "card birthday-settings" }, [
+    el("h2", {}, el("label", { for: "birthday-name" }, "お祝いの名前")),
+    el("p", { id: "birthday-name-hint", className: "hint" }, "任意・20字まで。空欄なら名前なしでお祝いします。"),
+    form,
+    status,
+  ]);
+}
+
 function exportFile() {
   const json = JSON.stringify(state, null, 2);
   return new File([json], `aishonote-${todayStr()}.json`, { type: "application/json" });
@@ -1287,17 +1326,7 @@ async function onEraseAll() {
   if (!(await showConfirm("本当に全データを消去しますか？", { okLabel: "消去", danger: true }))) return;
   if (!(await showConfirm("この操作は取り消せません。もう一度確認します。本当に消去しますか？", { okLabel: "消去する", danger: true }))) return;
   clearLevelNotice();
-  state = {
-    version: 2,
-    games: { [DEFAULT_GAME_ID]: { id: DEFAULT_GAME_ID, name: "大乱闘スマッシュブラザーズ SPECIAL", isPreset: true, customFighters: [] } },
-    activeGameId: DEFAULT_GAME_ID,
-    myFightersByGame: { [DEFAULT_GAME_ID]: [] },
-    activeFighterByGame: { [DEFAULT_GAME_ID]: null },
-    matches: [],
-    matchups: {},
-    progress: [],
-    practiceLog: {},
-  };
+  state = emptyState();
   persist();
   matchupSelected = null;
   logDraft = makeLogDraft();
@@ -1327,3 +1356,17 @@ function renderApp() {
 }
 
 renderApp();
+const birthdayNow = new Date();
+const birthdaySearch = window.location.search;
+if (shouldShowBirthday(state, birthdayNow, birthdaySearch)) {
+  showBirthday(state, birthdayNow, () => {
+    const patch = birthdayDismissalPatch(birthdayNow, birthdaySearch);
+    if (!Object.keys(patch).length) return;
+    state = { ...state, ...patch };
+    try {
+      persist();
+    } catch {
+      showAlert("お祝いを閉じた記録を保存できませんでした。次回起動時にもう一度表示されることがあります。");
+    }
+  });
+}

@@ -2,13 +2,20 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { pixelSprite, pixelIcon, xpBar, guideCard, levelNotice } from "../js/pixel-view.js";
 import { levelFromXp } from "../js/progression.js";
+import { birthdayCard, showBirthday } from "../js/birthday-view.js";
 
 // 最小のDOMダブル。実際の属性・rect・テキストノードを検査する（外部依存なし）。
-class Node {
-  constructor(tag, text = "") { this.tag = tag; this.text = text; this.attrs = {}; this.children = []; }
+class Node extends EventTarget {
+  constructor(tag, text = "") { super(); this.tag = tag; this.text = text; this.attrs = {}; this.children = []; }
   setAttribute(key, value) { this.attrs[key] = value; }
-  appendChild(child) { this.children.push(child); return child; }
-  addEventListener() {}
+  appendChild(child) { child.parent = this; this.children.push(child); return child; }
+  remove() { this.parent.children = this.parent.children.filter((child) => child !== this); }
+  showModal() { this.open = true; }
+  close() {
+    if (!this.open) return;
+    this.open = false;
+    this.dispatchEvent(new Event("close"));
+  }
 }
 const previousDocument = globalThis.document;
 globalThis.document = {
@@ -62,4 +69,58 @@ test("達成時のガイドとレベル通知: テキストでも結果が伝わ
   assert.match(allText(card), /Lv.99 達成/);
   assert.equal(flatten(card).filter((node) => node.tag === "button").length, 0);
   assert.match(allText(levelNotice(3)), /Lv.3 にレベルアップ/);
+});
+
+test("お祝いカード: 喜びの2コマと装飾の紙吹雪、見出し・ひとこと・閉じるボタン", () => {
+  const card = birthdayCard({}, new Date(2026, 9, 15), () => {});
+  const nodes = flatten(card);
+  assert.equal(nodes.filter((node) => node.attrs.class?.startsWith("pixel-frame")).length, 2);
+  assert.ok(nodes.some((node) => node.className === "guide-sprite joy birthday-coach"));
+  const confetti = nodes.find((node) => node.className === "birthday-confetti");
+  assert.equal(confetti.attrs["aria-hidden"], "true");
+  assert.equal(confetti.children.length, 12);
+  assert.equal(nodes.filter((node) => node.tag === "button").length, 1);
+  assert.match(allText(card), /お誕生日おめでとう！.*今年も一緒に強くなろう！.*閉じる/);
+  assert.doesNotMatch(allText(card), /これまでの練習/);
+});
+
+test("お祝いカード: 名前はテキストとして表示し、実績を下部に表示する", () => {
+  const birthdayName = "<img src=x>";
+  const card = birthdayCard({ birthdayName, practiceLog: { "2026-10-15": 50 } }, new Date(2026, 9, 15), () => {});
+  const nodes = flatten(card);
+  assert.ok(nodes.some((node) => node.tag === "#text" && node.text === `${birthdayName}、お誕生日おめでとう！`));
+  assert.ok(!nodes.some((node) => node.tag === "img" || node.tag === "script" || node.attrs.style));
+  assert.match(allText(card), /これまでの練習：合計50分・チェック0個・Lv2/);
+});
+
+test("お祝いダイアログ: ボタン・Escapeのどちらも1度だけ閉じ、スクロールとホームのフォーカスを戻す", (t) => {
+  t.after(() => {
+    delete document.body;
+    delete document.querySelector;
+  });
+  for (const action of ["button", "escape"]) {
+    const classes = new Set();
+    document.body = new Node("body");
+    document.body.classList = { add: (name) => classes.add(name), remove: (name) => classes.delete(name) };
+    let focused = false;
+    document.querySelector = () => ({ focus: () => { focused = true; } });
+    let dismissed = 0;
+    showBirthday({}, new Date(2026, 9, 15), () => { dismissed += 1; });
+    const dialog = document.body.children[0];
+    assert.equal(dialog.open, true);
+    assert.equal(dialog.attrs["aria-labelledby"], "birthday-title");
+    assert.equal(classes.has("birthday-open"), true);
+    if (action === "button") {
+      flatten(dialog).find((node) => node.tag === "button").dispatchEvent(new Event("click"));
+    } else {
+      const event = new Event("cancel", { cancelable: true });
+      dialog.dispatchEvent(event);
+      assert.equal(event.defaultPrevented, true);
+    }
+    dialog.close();
+    assert.equal(dismissed, 1);
+    assert.equal(document.body.children.length, 0);
+    assert.equal(classes.has("birthday-open"), false);
+    assert.equal(focused, true);
+  }
 });

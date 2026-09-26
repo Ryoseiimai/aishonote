@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { validateImport, sanitizeMatch, isValidFighterName, fightersOf, MAX_NAME_LEN, DEFAULT_GAME_ID } from "../js/store.js";
+import { validateImport, sanitizeMatch, isValidFighterName, fightersOf, MAX_NAME_LEN, DEFAULT_GAME_ID, emptyState, isValidBirthdayName, MAX_BIRTHDAY_NAME_LEN } from "../js/store.js";
 import { SSBU_FIGHTERS } from "../js/presets/ssbu.js";
 
 function validBase() {
@@ -35,6 +35,42 @@ function validBase() {
     },
   };
 }
+
+test("お祝いの名前: 任意・20字まで。21字以上と文字列以外は拒否", () => {
+  assert.equal(MAX_BIRTHDAY_NAME_LEN, 20);
+  for (const name of ["", "テスト", "あ".repeat(20)]) assert.equal(isValidBirthdayName(name), true);
+  for (const name of ["あ".repeat(21), null, undefined, 20, {}, []]) assert.equal(isValidBirthdayName(name), false);
+});
+
+test("validateImport: 旧データ・初期状態に個人名や閉じた年を持たせない", () => {
+  for (const state of [emptyState(), validateImport(validBase()).data]) {
+    assert.equal(state.birthdayName, "");
+    assert.equal(state.birthdayDismissedYear, null);
+  }
+});
+
+test("validateImport: お祝い名20字と閉じた年を保持し、名前の周囲の空白を除去", () => {
+  const result = validateImport({ ...validBase(), birthdayName: "あ".repeat(20), birthdayDismissedYear: 2026 });
+  assert.equal(result.ok, true);
+  assert.equal(result.data.birthdayName, "あ".repeat(20));
+  assert.equal(result.data.birthdayDismissedYear, 2026);
+  assert.equal(validateImport({ ...validBase(), birthdayName: "  テスト  " }).data.birthdayName, "テスト");
+});
+
+test("validateImport: 不正なお祝い名と年を初期化し、既存の対戦記録を保つ", () => {
+  for (const birthdayName of ["あ".repeat(21), null, 123, [], {}]) {
+    const result = validateImport({ ...validBase(), birthdayName });
+    assert.equal(result.ok, true);
+    assert.equal(result.data.birthdayName, "");
+    assert.equal(result.data.matches.length, 1);
+  }
+  for (const birthdayDismissedYear of [null, "2026", 0, -1, 2026.5, 10000, Infinity, {}, []]) {
+    const result = validateImport({ ...validBase(), birthdayDismissedYear });
+    assert.equal(result.ok, true);
+    assert.equal(result.data.birthdayDismissedYear, null);
+    assert.equal(result.data.matches.length, 1);
+  }
+});
 
 test("validateImport: 正常系はokかつデータを返す", () => {
   const r = validateImport(validBase());

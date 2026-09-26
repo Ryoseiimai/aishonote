@@ -9,6 +9,7 @@ export const MAX_BYTES = 4 * 1024 * 1024; // 4MB
 export const MAX_ARRAY_LEN = 10000;
 export const MAX_STRING_LEN = 500;
 export const MAX_NAME_LEN = 50;
+export const MAX_BIRTHDAY_NAME_LEN = 20;
 export const DEFAULT_GAME_ID = "ssbu";
 export const MAX_PROGRESS_ID_LEN = 100;
 export const MAX_PRACTICE_MINUTES_PER_DAY = 1440; // 1日24時間分が上限
@@ -64,6 +65,8 @@ export function emptyState() {
     matchups: {},
     progress: [], // 上達ロードマップ・キャラ専用メニューでチェック済みの項目id
     practiceLog: {}, // 日付(YYYY-MM-DD) -> その日の練習分数
+    birthdayName: "", // 任意のお祝い名。個人名の既定値は持たない
+    birthdayDismissedYear: null, // 最後にお祝いを閉じた端末の年
   };
 }
 
@@ -89,6 +92,11 @@ function isValidDate(v) {
 /** カスタムキャラ名を検証する(1〜50字) */
 export function isValidFighterName(name) {
   return typeof name === "string" && name.trim().length > 0 && name.length <= MAX_NAME_LEN;
+}
+
+/** 入力欄のmaxlengthと同じ長さで検証。任意のお祝い名は空欄も有効。 */
+export function isValidBirthdayName(name) {
+  return typeof name === "string" && name.length <= MAX_BIRTHDAY_NAME_LEN;
 }
 
 /**
@@ -282,12 +290,16 @@ export function validateImport(raw) {
   // 型がおかしい・欠けている場合はエラーにせず空で補完する(旧データを壊さない)。
   const progress = sanitizeProgress(raw.progress);
   const practiceLog = sanitizePracticeLog(raw.practiceLog);
+  // 任意の追加フィールドは欠損・不正でも他の記録を失わないよう初期値に戻す。
+  const birthdayName = isValidBirthdayName(raw.birthdayName) ? raw.birthdayName.trim() : "";
+  const birthdayDismissedYear = Number.isInteger(raw.birthdayDismissedYear) &&
+    raw.birthdayDismissedYear >= 1 && raw.birthdayDismissedYear <= 9999 ? raw.birthdayDismissedYear : null;
 
   if (errors.length > 0) {
     return { ok: false, errors };
   }
 
-  const data = { version: 2, games, activeGameId, myFightersByGame, activeFighterByGame, matches, matchups, progress, practiceLog };
+  const data = { version: 2, games, activeGameId, myFightersByGame, activeFighterByGame, matches, matchups, progress, practiceLog, birthdayName, birthdayDismissedYear };
   const size = new TextEncoder().encode(JSON.stringify(data)).length;
   if (size > MAX_BYTES) {
     return { ok: false, errors: [`データサイズが上限(4MB)を超えています`] };

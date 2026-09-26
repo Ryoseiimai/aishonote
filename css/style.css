@@ -982,3 +982,78 @@ h1, h2, h3, .guide-level, .guide-name, .level-notice {
   .xp-dot { fill: Canvas; stroke: CanvasText; }
   .xp-dot.filled { fill: CanvasText; }
 }
+
+/* お祝いは起動時だけ。全画面dialogはホームの再描画の影響を受けない。 */
+body.birthday-open { overflow: hidden; }
+.birthday-dialog {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  padding: calc(24px + env(safe-area-inset-top, 0px)) calc(20px + env(safe-area-inset-right, 0px)) calc(24px + env(safe-area-inset-bottom, 0px)) calc(20px + env(safe-area-inset-left, 0px));
+  background: var(--bg);
+  color: var(--fg);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  font-family: "DotGothic16", sans-serif;
+}
+.birthday-dialog[open] { display: flex; }
+.birthday-dialog::backdrop { background: var(--bg); }
+.birthday-card {
+  position: relative;
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: 440px;
+  margin: auto;
+  padding: 40px 24px 24px;
+  border: 3px solid var(--accent);
+  box-shadow: 6px 6px 0 var(--border);
+  background: var(--card-bg);
+  text-align: center;
+  overflow: hidden;
+}
+.birthday-card > :not(.birthday-confetti) { position: relative; }
+.birthday-date { margin: 0 0 24px; color: var(--accent); font-size: 16px; letter-spacing: 2px; }
+.birthday-coach { width: 144px; height: 144px; margin: auto; background: transparent; border: 0; }
+.birthday-coach .pixel-frame { width: 144px; height: 144px; }
+.birthday-card h1 { margin: 24px 0 16px; font-size: clamp(24px, 6vw, 32px); line-height: 1.6; overflow-wrap: anywhere; }
+.birthday-message { margin: 0 0 24px; font-size: 18px; }
+.birthday-summary { padding-top: 16px; border-top: 2px dotted var(--border); font-size: 16px; overflow-wrap: anywhere; }
+.birthday-close { width: 100%; margin-top: 8px; min-height: 48px; }
+.birthday-settings input { min-width: 0; width: 100%; }
+.birthday-settings [role="status"]:empty { display: none; }
+.birthday-confetti { position: absolute; inset: 0; pointer-events: none; }
+.birthday-confetti i {
+  position: absolute;
+  top: 8%;
+  left: 6%;
+  width: 6px;
+  height: 10px;
+  background: var(--accent);
+  animation: birthday-fall 2.4s steps(12, end) 2;
+}
+.birthday-confetti i:nth-child(2n) { background: var(--fg); width: 8px; height: 6px; animation-delay: -0.6s; }
+.birthday-confetti i:nth-child(3n) { background: #be8b24; animation-delay: -1.2s; }
+.birthday-confetti i:nth-child(2) { left: 22%; top: 3%; }
+.birthday-confetti i:nth-child(3) { left: 76%; top: 6%; }
+.birthday-confetti i:nth-child(4) { left: 91%; top: 18%; }
+.birthday-confetti i:nth-child(5) { left: 11%; top: 28%; }
+.birthday-confetti i:nth-child(6) { left: 84%; top: 36%; }
+.birthday-confetti i:nth-child(7) { left: 3%; top: 48%; }
+.birthday-confetti i:nth-child(8) { left: 94%; top: 55%; }
+.birthday-confetti i:nth-child(9) { left: 6%; top: 68%; }
+.birthday-confetti i:nth-child(10) { left: 88%; top: 75%; }
+.birthday-confetti i:nth-child(11) { left: 17%; top: 88%; }
+.birthday-confetti i:nth-child(12) { left: 74%; top: 92%; }
+@keyframes birthday-fall {
+  0% { transform: translate(0, -24px); }
+  50% { transform: translate(8px, 12px) rotate(90deg); }
+  100% { transform: translate(0, 48px) rotate(180deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .birthday-confetti i { animation: none; }
+}
