@@ -19,6 +19,7 @@ rsync -a --delete --delete-excluded \
   --exclude 'tests/' \
   --exclude '.github/' \
   --exclude 'store/' \
+  --exclude 'AI_Logs/' \
   --exclude 'ios/' \
   --exclude 'node_modules/' \
   --exclude 'www/' \

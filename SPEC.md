@@ -14,7 +14,7 @@
 
 ## セキュリティ要件（みんなで見るので必須）
 1. ユーザー入力を DOM に出すときは **必ず textContent か手書きの escapeHtml** を通す。`innerHTML` に未エスケープ文字列を渡す箇所をゼロにする。
-2. `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; manifest-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'">` をヘッダに入れ、インラインscript/inline style属性を使わない（CSS は外部ファイル、JS は外部ファイル）。
+2. `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; manifest-src 'self'; base-uri 'none'; form-action 'none'">` をヘッダに入れ、インラインscript/inline style属性を使わない（CSS は外部ファイル、JS は外部ファイル）。`font-src 'self'` は同梱DotGothic16のために使用。`frame-ancestors` はmetaでは無効なため、必要時にHTTPヘッダで設定する。
 3. `eval` / `new Function` / `javascript:` URL / `document.write` 禁止。
 4. JSON インポートは **スキーマ検証**（型・必須キー・配列長上限 10,000 件・文字列長上限 500 文字・許可キー以外は捨てる）を通してから保存。失敗時は何も上書きしない。
 5. localStorage のキーは `smashnote.v1` 1本。保存前に JSON.stringify のサイズ上限（4MB）を確認。
@@ -78,3 +78,9 @@ JS は `type="module"` の ES Modules で書く。
 - クラウド同期・共有・ランキング・ログイン。
 - 公式画像・音源の使用。
 - オンライン対戦データの自動取得。
+
+## オリジナルのドット装飾・レベル（2026-09-27）
+- ガイド「むすびコーチ（おにぎり型のオリジナルキャラ）」は32×32、待機2コマ・喜び2コマ。白い三角の体に赤い鉢巻き、下半分の黒いのり、点目とにっこり口、小さな手のガッツポーズ。待機は鉢巻きの揺れ、喜びは両手を上げて弾む動き。アイコンは16×16。JSのパレットと行文字列からSVGのrectを描く。既存作品のキャラ・ロゴ・画面を模倣しない。
+- ホームと上達に次の一歩・連続日数に応じた固定文面、全キャラ共通のXPを表示。既知のロードマップ／キャラ専用チェック1件=25 XP、記録された練習1分=2 XP。解除でXPも戻る。XPの保存フィールドは追加しない。
+- Lv1=0 XP、Lv2=100 XP、以降必要XPは50ずつ増加。Lv99が上限。操作でレベルが上がったときだけ短いCSS演出。読み込み・インポートでは再生しない。`prefers-reduced-motion` で全ドット演出を無効化。
+- DotGothic16（OFL 1.1）のWOFF2とライセンスを同梱し、見出しのみself配信。本文はシステムフォントのまま。外部フォント通信は行わない。

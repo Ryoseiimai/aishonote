@@ -6,6 +6,8 @@ import { showAlert, showConfirm } from "./dialog.js";
 import { SHIRATSUKI_URL, PRIVACY_POLICY_URL } from "./external-links.js";
 import { SSBU_CURRICULUM } from "./presets/ssbu-curriculum.js";
 import { characterMenuView } from "./char-curriculum-display.js";
+import { experience } from "./progression.js";
+import { guideCard, pixelIcon, levelNotice } from "./pixel-view.js";
 import {
   stageRate,
   overallRate,
@@ -23,6 +25,7 @@ import {
   isValidFighterName,
   MAX_STRING_LEN,
   MAX_NAME_LEN,
+  MAX_PRACTICE_MINUTES_PER_DAY,
   DEFAULT_GAME_ID,
 } from "./store.js";
 import {
@@ -56,8 +59,25 @@ let growthRemainingSec = 0;
 let growthTimerId = null;
 let growthStepChecks = []; // ステップごとのチェック(表示用。記録は分数だけ)
 let termQuery = ""; // 用語辞典の検索語
+let openRoadmapStages = new Set();
 
 const root = document.getElementById("app");
+// 通常の再描画やタイマー更新で演出を繰り返さない、独立した通知領域。
+const levelStatus = el("div", { className: "level-status", role: "status", "aria-live": "polite", "aria-atomic": "true" });
+document.body.appendChild(levelStatus);
+let levelNoticeTimer = null;
+
+function clearLevelNotice() {
+  clearTimeout(levelNoticeTimer);
+  levelNoticeTimer = null;
+  clear(levelStatus);
+}
+
+function celebrateLevel(level) {
+  clearLevelNotice();
+  levelStatus.appendChild(levelNotice(level));
+  levelNoticeTimer = setTimeout(clearLevelNotice, 2400);
+}
 
 // 相性の目安の同梱データ（シラツキ理論の相性表の抜粋）は Web 版だけが読み込む。
 // iOS版は www/ にこのファイル自体が入らず（scripts/sync-www.sh）、MATCHUP_LINKS の出典URLでリンク案内だけ出す。
@@ -112,8 +132,12 @@ function persist() {
 }
 
 function setState(patch) {
+  const previousLevel = experience(state).level;
   state = { ...state, ...patch };
   persist();
+  const nextLevel = experience(state).level;
+  if (nextLevel > previousLevel) celebrateLevel(nextLevel);
+  else if (nextLevel < previousLevel) clearLevelNotice();
   renderApp();
 }
 
@@ -178,9 +202,10 @@ function renderBottomNav() {
         {
           type: "button",
           className: tab === currentTab ? "nav-btn active" : "nav-btn",
+          "aria-current": tab === currentTab ? "page" : null,
           onClick: () => switchTab(tab),
         },
-        TAB_LABELS[tab]
+        [pixelIcon(tab), el("span", {}, TAB_LABELS[tab])]
       )
     )
   );
@@ -299,15 +324,12 @@ function renderHome() {
 // ---------- ホームの小カード(上達ロードマップの次の一歩・今日の練習状況) ----------
 function renderNextStepCard() {
   const step = nextStep(SSBU_CURRICULUM.roadmap, new Set(state.progress));
-  return el("div", { className: "card" }, [
-    el("h2", {}, "次の一歩"),
-    step
-      ? el("div", {}, [
-          el("p", { className: "next-step-title" }, step.item.title),
-          el("p", { className: "hint" }, `段階: ${step.stageTitle}`),
-        ])
-      : el("p", { className: "hint" }, "ロードマップの全項目を達成しています。"),
-  ]);
+  return guideCard({
+    stats: experience(state), step,
+    streak: practiceStreak(state.practiceLog, todayStr()),
+    levelUp: levelNoticeTimer !== null,
+    onNext: currentTab === "home" ? () => switchTab("growth") : null,
+  });
 }
 
 function renderPracticeStatusCard() {
@@ -322,7 +344,7 @@ function renderPracticeStatusCard() {
 function summaryBox(label, value) {
   return el("div", { className: "summary-box" }, [
     el("div", { className: "summary-value" }, value),
-    el("div", { className: "summary-label" }, label),
+    el("div", { className: "summary-label" }, label === "連続日数" ? [pixelIcon("flame"), label] : label),
   ]);
 }
 
@@ -404,7 +426,7 @@ function completeGrowthSession() {
   stopGrowthTimer();
   if (!growthDuration) return;
   const today = todayStr();
-  const practiceLog = { ...state.practiceLog, [today]: (state.practiceLog[today] || 0) + growthDuration };
+  const practiceLog = { ...state.practiceLog, [today]: Math.min(MAX_PRACTICE_MINUTES_PER_DAY, (state.practiceLog[today] || 0) + growthDuration) };
   growthDuration = null;
   growthRemainingSec = 0;
   growthStepChecks = [];
@@ -492,6 +514,7 @@ function renderRoadmapItem(item, progressSet) {
   return el("li", { className: "roadmap-item" }, [
     el("label", { className: "roadmap-item-label" }, [
       el("input", { type: "checkbox", checked, onChange: () => toggleProgress(item.id) }),
+      checked ? pixelIcon("check") : null,
       el("span", { className: "roadmap-item-title" }, item.title),
     ]),
     el("p", { className: "hint" }, item.desc),
@@ -506,10 +529,10 @@ function toggleProgress(id) {
   setState({ progress: [...set] });
 }
 
-function renderRoadmapStage(stage, progressSet) {
+function renderRoadmapStage(stage, progressSet, index) {
   const rate = stageRate(stage, progressSet);
-  return el("details", { className: "roadmap-stage" }, [
-    el("summary", {}, `${stage.title}（${Math.round(rate * 100)}%）`),
+  return el("details", { className: "roadmap-stage", dataset: { stage: stage.stage }, open: openRoadmapStages.has(stage.stage) }, [
+    el("summary", {}, [pixelIcon(`stage${index + 1}`), `${stage.title}（${Math.round(rate * 100)}%）`]),
     el("p", { className: "hint" }, stage.goal),
     el("div", { className: `progress-bar progress-w-${roundRateToStep(rate)}` }, [
       el("div", { className: "progress-fill" }),
@@ -531,7 +554,7 @@ function renderRoadmap() {
       el("div", { className: "progress-fill" }),
     ]),
     el("p", { className: "hint" }, `全体の達成率 ${Math.round(overall * 100)}%`),
-    ...SSBU_CURRICULUM.roadmap.map((stage) => renderRoadmapStage(stage, progressSet)),
+    ...SSBU_CURRICULUM.roadmap.map((stage, index) => renderRoadmapStage(stage, progressSet, index)),
   ]);
 }
 
@@ -633,6 +656,7 @@ function renderCurriculumSources() {
 
 function renderGrowth() {
   return el("section", { className: "panel" }, [
+    renderNextStepCard(),
     renderTodayPractice(),
     renderRoadmap(),
     renderCharacterMenu(),
@@ -1248,6 +1272,7 @@ function onImportFile(e) {
       e.target.value = "";
       return;
     }
+    clearLevelNotice();
     state = result.data;
     persist();
     matchupSelected = null;
@@ -1261,6 +1286,7 @@ function onImportFile(e) {
 async function onEraseAll() {
   if (!(await showConfirm("本当に全データを消去しますか？", { okLabel: "消去", danger: true }))) return;
   if (!(await showConfirm("この操作は取り消せません。もう一度確認します。本当に消去しますか？", { okLabel: "消去する", danger: true }))) return;
+  clearLevelNotice();
   state = {
     version: 2,
     games: { [DEFAULT_GAME_ID]: { id: DEFAULT_GAME_ID, name: "大乱闘スマッシュブラザーズ SPECIAL", isPreset: true, customFighters: [] } },
@@ -1280,6 +1306,9 @@ async function onEraseAll() {
 
 // ---------- ルート描画 ----------
 function renderApp() {
+  // チェックしてXPを更新しても、開いていた段階を閉じない。
+  const stages = root.querySelectorAll(".roadmap-stage");
+  if (stages.length) openRoadmapStages = new Set([...stages].filter((node) => node.open).map((node) => node.dataset.stage));
   clear(root);
   const panel =
     currentTab === "home"

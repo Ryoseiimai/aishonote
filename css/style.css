@@ -1,3 +1,11 @@
+@font-face {
+  font-family: "DotGothic16";
+  src: url("../fonts/DotGothic16-Regular.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+}
+
 :root {
   --accent: #D7263D;
   --bg: #ffffff;
@@ -5,8 +13,8 @@
   --muted: #666666;
   --border: #dddddd;
   --card-bg: #fafafa;
-  --win: #1a7a3a;
-  --lose: #b3261e;
+  --win: var(--fg);
+  --lose: var(--accent);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -16,8 +24,8 @@
     --muted: #aaaaaa;
     --border: #333333;
     --card-bg: #1c1c1c;
-    --win: #4fd07a;
-    --lose: #ff8a80;
+    --win: var(--fg);
+    --lose: var(--accent);
   }
 }
 
@@ -135,7 +143,8 @@ body {
 .card {
   background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 2px;
+  box-shadow: 3px 3px 0 var(--border);
   padding: 16px;
 }
 
@@ -786,4 +795,190 @@ body::before {
   margin-top: 12px;
   font-size: 13px;
   overflow-wrap: anywhere;
+}
+
+/* ドットは見出しと小さな装飾に限定。本文はシステムフォント。 */
+h1, h2, h3, .guide-level, .guide-name, .level-notice {
+  font-family: "DotGothic16", sans-serif;
+  font-weight: 400;
+  font-synthesis: none;
+}
+
+/* 説明文もスマートフォンで縮めずに読める大きさにする。 */
+.hint, .homework-item h3, .log-form label, .summary-label,
+.glossary-desc, .review-list h3, .sources-card, .character-menu-sources {
+  font-size: 16px;
+}
+
+.pixel-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  vertical-align: -2px;
+  image-rendering: pixelated;
+}
+.pixel-icon .dot-ink { fill: currentColor; }
+.dot-ink { fill: #262626; }
+.dot-shadow { fill: #747474; }
+.dot-cloth { fill: #bcbcbc; }
+.dot-white { fill: #ffffff; }
+.dot-accent { fill: var(--accent); }
+
+.nav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 66px;
+}
+.nav-btn.active { box-shadow: inset 0 3px 0 var(--accent); }
+.bottom-nav { z-index: 10; }
+.summary-label .pixel-icon { margin-right: 6px; }
+.roadmap-stage summary .pixel-icon { margin-right: 8px; }
+.roadmap-item-label > .pixel-icon { color: var(--accent); }
+
+.guide-card { padding: 16px; }
+.guide-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.guide-heading h2 { margin: 0; }
+.guide-level {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 20px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.guide-conversation {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.guide-portrait { text-align: center; }
+.guide-sprite {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  /* 紙色の小台紙はダークモードでもキャラの輪郭を確保する。 */
+  background: var(--bg);
+  border-bottom: 2px dotted var(--border);
+}
+.pixel-frame {
+  position: absolute;
+  inset: 0;
+  width: 96px;
+  height: 96px;
+  image-rendering: pixelated;
+}
+.frame-1 { visibility: hidden; }
+/* 待機は4.8秒、喜びは2秒で停止し、本文を読む間は静かにする。 */
+.idle .frame-0 { animation: pixel-first 1.6s step-end 3; }
+.idle .frame-1 { animation: pixel-second 1.6s step-end 3; }
+.joy .frame-0 { animation: pixel-first 0.5s step-end 4; }
+.joy .frame-1 { animation: pixel-second 0.5s step-end 4; }
+@keyframes pixel-first {
+  0%, 100% { visibility: visible; }
+  50% { visibility: hidden; }
+}
+@keyframes pixel-second {
+  0%, 100% { visibility: hidden; }
+  50% { visibility: visible; }
+}
+.guide-name { display: block; margin-top: 4px; font-size: 16px; }
+.guide-bubble {
+  position: relative;
+  margin: 0;
+  padding: 12px;
+  border: 2px solid var(--border);
+  background: var(--bg);
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+.guide-bubble::before {
+  content: "";
+  position: absolute;
+  left: -8px;
+  top: 22px;
+  width: 8px;
+  height: 8px;
+  border-left: 2px solid var(--border);
+  border-bottom: 2px solid var(--border);
+  background: var(--bg);
+}
+.pixel-xp { display: block; width: 100%; height: 12px; image-rendering: pixelated; }
+.xp-dot { fill: var(--border); }
+.xp-dot.filled { fill: var(--fg); }
+.xp-caption { margin: 6px 0; color: var(--muted); font-size: 16px; }
+.xp-help { font-size: 16px; color: var(--muted); }
+.xp-help summary { cursor: pointer; min-height: 44px; padding: 8px 0; }
+.xp-help p { margin: 0 0 12px; }
+.guide-next { border-top: 2px dotted var(--border); padding-top: 12px; }
+.guide-next h3 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 16px; }
+.guide-next .next-step-title { margin: 8px 0 4px; }
+.guide-next .hint { margin: 0 0 12px; }
+.guide-next .secondary-btn { width: 100%; }
+
+.level-status {
+  position: fixed;
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+  left: 12px;
+  right: 12px;
+  z-index: 20;
+  pointer-events: none;
+}
+.level-notice {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  max-width: 360px;
+  margin: auto;
+  padding: 16px;
+  border: 2px solid var(--fg);
+  background: var(--bg);
+  box-shadow: 4px 4px 0 var(--border);
+  font-size: 18px;
+  animation: pixel-arrive 240ms steps(3, end);
+}
+.level-particles { position: absolute; inset: 0; }
+.level-particles i {
+  position: absolute;
+  top: 4px;
+  left: 20%;
+  width: 4px;
+  height: 4px;
+  background: var(--accent);
+  opacity: 0;
+  animation: pixel-rise 850ms steps(5, end);
+}
+.level-particles i:nth-child(2) { left: 50%; animation-delay: 100ms; }
+.level-particles i:nth-child(3) { left: 80%; animation-delay: 200ms; }
+@keyframes pixel-arrive {
+  from { transform: translateY(8px); }
+  to { transform: translateY(0); }
+}
+@keyframes pixel-rise {
+  0% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-24px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .guide-sprite .pixel-frame, .level-notice, .level-particles i { animation: none; }
+  .level-particles { display: none; }
+}
+@media (forced-colors: active) {
+  .dot-ink, .dot-shadow, .dot-cloth, .dot-accent { fill: CanvasText; }
+  .dot-white { fill: Canvas; }
+  .xp-dot { fill: Canvas; stroke: CanvasText; }
+  .xp-dot.filled { fill: CanvasText; }
 }

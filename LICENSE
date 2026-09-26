@@ -23,3 +23,10 @@ SOFTWARE.
 ---
 
 js/presets/matchup-reference.js の相性データはMITライセンスの対象外で、権利は出典（シラツキ理論）に帰属します。
+
+ドット絵はすべて本アプリのオリジナルで、上記MIT Licenseの対象です。
+ガイド「むすびコーチ（おにぎり型のオリジナルキャラ）」・アイコン・XP装飾は、既存のキャラクター・ロゴ・ゲーム画面を模倣していません。
+
+DotGothic16（fonts/DotGothic16-Regular.woff2）はMIT Licenseの対象外です。
+Copyright 2020 The DotGothic16 Project Authors.
+SIL Open Font License（OFL）Version 1.1で配布されています。全文は fonts/OFL.txt を参照してください。
