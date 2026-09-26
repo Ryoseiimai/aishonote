@@ -109,6 +109,7 @@ body {
   border: 1px solid var(--border);
   border-radius: 999px;
   padding: 2px 8px;
+  white-space: nowrap;
 }
 
 .inline-form {
@@ -1099,6 +1100,7 @@ body.birthday-open { overflow: hidden; }
   border-color: var(--accent);
   box-shadow: inset 4px 0 0 var(--accent);
 }
+.diag-disclaimer { margin: 0 0 12px; font-size: 14px; font-weight: 700; }
 .type-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
 .axis-list { display: flex; flex-direction: column; gap: 10px; }
 .axis-row {
@@ -1162,7 +1164,9 @@ body.birthday-open { overflow: hidden; }
   font-size: 16px;
 }
 .pick-name { margin: 0; font-size: 20px; flex: 1 1 auto; }
-.pick-percent { font-family: "DotGothic16", sans-serif; font-size: 18px; white-space: nowrap; }
+.pick-stars { display: inline-flex; align-items: baseline; gap: 4px; white-space: nowrap; }
+.pick-stars-label { font-size: 14px; color: var(--muted); }
+.pick-stars-value { font-size: 18px; color: var(--accent); letter-spacing: 1px; }
 .pick-oneline { margin: 8px 0; }
 .pick-why { margin: 8px 0 0; font-weight: 700; }
 .pick-reasons { margin: 4px 0 8px; padding-left: 20px; }
@@ -1186,6 +1190,7 @@ body.birthday-open { overflow: hidden; }
 .first-steps .hint, .diagnosis .hint { margin: 4px 0 0; }
 .wide-btn { width: 100%; margin-top: 16px; }
 .diag-about summary { cursor: pointer; min-height: 44px; padding: 8px 0; font-weight: 700; }
+.diag-source-name { margin: 12px 0 4px; font-size: 16px; }
 .diag-about .sources-list { overflow-wrap: anywhere; font-size: 16px; padding-left: 20px; }
 .diag-preview { margin-bottom: 12px; }
 .coming-soon .guide-conversation { margin-bottom: 0; }

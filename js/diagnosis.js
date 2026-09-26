@@ -19,7 +19,7 @@ export const TYPES = Object.freeze({
   ANSO: { name: "突撃スピードスター", desc: "素早く懐に飛び込み、手数で押し切るタイプ。迷ったらまず前へ出られるのが強み。" },
   ANST: { name: "変幻ニンジャ", desc: "速さと小技で相手をかく乱するタイプ。読まれにくい動きで主導権を握る。" },
   ANPO: { name: "真っ向ブレイカー", desc: "正面から殴り合い、重い一撃で決めるタイプ。シンプルな力比べが得意。" },
-  ANPT: { name: "一発逆転ギャンブラー", desc: "力技とクセのある技で試合をひっくり返すタイプ。劣勢でも諦めない。" },
+  ANPT: { name: "一発逆転チャレンジャー", desc: "力技とクセのある技で試合をひっくり返すタイプ。劣勢でも諦めない。" },
   AFSO: { name: "速攻ガンナー", desc: "撃ちながら走り込んで先手を取るタイプ。距離を詰めるきっかけ作りがうまい。" },
   AFST: { name: "翻弄マジシャン", desc: "飛び道具と仕掛けで相手を振り回しながら攻めるタイプ。" },
   AFPO: { name: "間合いの剣豪", desc: "長いリーチで押し込み、先端で仕留めるタイプ。間合い管理が武器。" },
@@ -33,6 +33,18 @@ export const TYPES = Object.freeze({
   WFPO: { name: "要塞スナイパー", desc: "遠くから重い攻撃を置き、相手を寄せつけないタイプ。" },
   WFPT: { name: "魔導ストラテジスト", desc: "多彩な道具と大技で盤面を支配するタイプ。考えるのが好きな人向け。" },
 });
+
+/** 4軸ともほぼ真ん中（BALANCE_MARGIN 以内）のときに、16タイプの名前の代わりに出す名前。 */
+export const ALL_ROUNDER = Object.freeze({
+  name: "オールラウンダー",
+  desc: "どの戦い方にも大きな偏りがないタイプ。いろいろなキャラを触りながら、しっくりくる動きを探せるのが強み。",
+});
+
+/** 0.5 からこの幅以内（0.4〜0.6）の軸は「どちらでもない＝バランス」として表示する。タイプの決め方（キー）は変えない。 */
+export const BALANCE_MARGIN = 0.1;
+
+/** おすすめ度（★1〜3）のしきい値。スコアの見かけの細かさ（1%刻み）を出さないため3段階に丸める。 */
+const STAR_THRESHOLDS = Object.freeze([0.9, 0.8]);
 
 // 軸以外に直接くらべる指標（重み）。軸は各1。
 const AXIS_WEIGHTS = Object.freeze({ attack: 1, distance: 1, power: 1, trick: 1, air: 0.6, projectile: 0.6, damage: 0.6, recovery: 0.6 });
@@ -87,10 +99,31 @@ export function userVector(answers) {
   };
 }
 
-/** 4軸の値からタイプを決める。ちょうど0.5（どちらでもない）は左の極に寄せる。 */
+/** 0.5 前後（0.4〜0.6）か。浮動小数の誤差で端が外れないよう少しだけ余裕をもたせる。 */
+export function isBalanced(value) {
+  return Math.abs(value - 0.5) <= BALANCE_MARGIN + 1e-9;
+}
+
+/**
+ * 4軸の値からタイプを決める。キーはちょうど0.5（どちらでもない）を左の極に寄せて決めるが、
+ * 0.4〜0.6 の軸は表示上「バランス」とし（side = `${left}と${right}のバランス`・balanced=true）、
+ * 4軸ともバランスなら名前と説明を ALL_ROUNDER にする（allRounder=true）。
+ */
 export function typeOf(vector) {
   const key = AXES.map((axis) => axis.letters[vector[axis.id] > 0.5 ? 1 : 0]).join("");
-  return { key, ...TYPES[key], axes: AXES.map((axis) => ({ ...axis, value: vector[axis.id], side: vector[axis.id] > 0.5 ? axis.right : axis.left })) };
+  const axes = AXES.map((axis) => {
+    const value = vector[axis.id];
+    const balanced = isBalanced(value);
+    const side = balanced ? `${axis.left}と${axis.right}のバランス` : value > 0.5 ? axis.right : axis.left;
+    return { ...axis, value, balanced, side };
+  });
+  const allRounder = axes.every((a) => a.balanced);
+  return { key, ...(allRounder ? ALL_ROUNDER : TYPES[key]), allRounder, axes };
+}
+
+/** スコア（0〜1）→ おすすめ度 ★1〜3。 */
+export function starsOf(score) {
+  return score >= STAR_THRESHOLDS[0] ? 3 : score >= STAR_THRESHOLDS[1] ? 2 : 1;
 }
 
 /** 1体との近さ（0〜1）。復帰は「重視するのに弱い」ときだけ減点する。 */
@@ -122,6 +155,27 @@ const REASONS = Object.freeze({
   recovery: [null, "復帰が強く場外から戻りやすい"],
 });
 
+// 合成した軸は向きだけだと元の指標と食い違う（例: 最遅のプリンに「足が速い」）ので、
+// この表にある言葉は元の5段階の指標が当てはまるときだけ理由にする。null はその向きに条件なし。
+const REASON_FACTS = Object.freeze({
+  power: [(p) => p.speed >= 4, (p) => p.weight >= 4 && p.killPower >= 4],
+  damage: [(p) => p.combo >= 4, (p) => p.killPower >= 4],
+  trick: [null, (p) => p.gimmick.trim() !== ""],
+});
+
+function factHolds(key, side, profile) {
+  const fact = REASON_FACTS[key]?.[side];
+  return !fact || fact(profile);
+}
+
+/** 理由に使う向き。合成値の向きが元の指標と合わなければ、逆向きの条件が明確に当てはまるときだけそちらを使う。 */
+function reasonSide(key, c, profile) {
+  const preferred = c > 0.5 ? 1 : 0;
+  if (factHolds(key, preferred, profile)) return preferred;
+  const other = 1 - preferred;
+  return REASON_FACTS[key]?.[other] && REASON_FACTS[key][other](profile) ? other : null;
+}
+
 /** 一致した指標を言葉で2〜3個。ユーザーがはっきり答えた軸ほど優先する。 */
 export function matchReasons(user, char, profile, { beginner = false } = {}) {
   const candidates = [];
@@ -129,10 +183,11 @@ export function matchReasons(user, char, profile, { beginner = false } = {}) {
     const u = user[key];
     const c = char[key];
     if (c === 0.5) continue; // ちょうど真ん中の指標は「どちらかが得意」と言えないので理由にしない
-    const side = c > 0.5 ? 1 : 0;
+    const side = reasonSide(key, c, profile);
+    if (side === null) continue;
     const text = REASONS[key][side];
     if (!text) continue;
-    const agree = (u > 0.5) === (c > 0.5) && u !== 0.5;
+    const agree = u !== 0.5 && (u > 0.5) === (side === 1);
     const strength = Math.abs(u - 0.5) * 2;
     const fit = 1 - Math.abs(u - c);
     candidates.push({ key, text, agree, score: strength * fit, fit });
@@ -167,7 +222,8 @@ export function missingProfiles(fighters = SSBU_FIGHTERS, profiles = SSBU_FIGHTE
 
 /**
  * おすすめ上位 n 体。スコア降順、同点は SSBU_FIGHTERS の並び順（結果が毎回同じになる）。
- * @returns {{ type, user, picks: Array<{ name, percent, score, oneLine, reasons, profile }> }}
+ * 特徴データが1体もなければ picks は空配列（画面側で「準備中」を出す）。
+ * @returns {{ type, user, picks: Array<{ name, percent, stars, score, oneLine, reasons, profile }> }}
  */
 export function diagnose(answers, { n = 3, fighters = SSBU_FIGHTERS, profiles = SSBU_FIGHTER_PROFILES } = {}) {
   const values = answerValues(answers);
@@ -186,6 +242,7 @@ export function diagnose(answers, { n = 3, fighters = SSBU_FIGHTERS, profiles = 
     name,
     score,
     percent: Math.min(99, Math.round(score * 100)),
+    stars: starsOf(score),
     oneLine: profile.oneLine,
     reasons: matchReasons(user, char, profile, { beginner }),
     profile,

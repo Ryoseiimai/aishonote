@@ -10,8 +10,8 @@ import { experience } from "./progression.js";
 import { guideCard, pixelIcon, levelNotice, coachSay } from "./pixel-view.js";
 import { QUESTIONS, DIAGNOSIS_VERSION, isCompleteAnswers } from "./diagnosis-questions.js";
 import { diagnose } from "./diagnosis.js";
-import { diagnosisEntryCard, diagnosisQuiz, diagnosisResult } from "./diagnosis-view.js";
-import { gameMenuEntries, isComingSoonGame, comingSoonGameDefinition, COMING_SOON_NOTICE } from "./games.js";
+import { diagnosisEntryCard, diagnosisQuiz, diagnosisResult, diagnosisUnavailable } from "./diagnosis-view.js";
+import { gameMenuEntries, isComingSoonGame, visibleGames, selectGamePatch, nativeSafeState, makeMyFighterPatch, diagnosisViewFor, DIAGNOSIS_GAME_ID, COMING_SOON_NOTICE } from "./games.js";
 import { shouldShowBirthday, birthdayDismissalPatch } from "./birthday.js";
 import { showBirthday } from "./birthday-view.js";
 import { consumeGiftLink } from "./gift-link.js";
@@ -104,6 +104,8 @@ function celebrateLevel(level) {
 // 相性の目安の同梱データ（シラツキ理論の相性表の抜粋）は Web 版だけが読み込む。
 // iOS版は www/ にこのファイル自体が入らず（scripts/sync-www.sh）、MATCHUP_LINKS の出典URLでリンク案内だけ出す。
 const IS_NATIVE = isNativePlatform();
+// iOSアプリ内では、一覧から隠れる準備中ゲーム（Web版からのインポート由来）を選んだまま開かない。
+state = nativeSafeState(state, { isNative: IS_NATIVE });
 let referenceModule = null; // { MATCHUP_REFERENCE, MATCHUP_REFERENCE_META }
 if (!IS_NATIVE || EMBED_REFERENCE_ON_NATIVE) {
   import("./presets/matchup-reference.js")
@@ -171,23 +173,14 @@ function switchTab(tab) {
   window.scrollTo(0, 0);
 }
 
-/** ゲームを切り替える。まだ保存していない準備中のゲームは、選んだときに普通のゲームとして追加する。 */
+/** ゲームを切り替える。state の差分は games.js の selectGamePatch（準備中ゲームの追加・取り除きもそこで決める）。 */
 function selectGame(gameId) {
+  const patch = selectGamePatch(state, gameId);
+  if (!patch) return;
   matchupSelected = null;
   diagnosisView = null;
   growthMenuFighter = null;
-  if (state.games[gameId]) {
-    setState({ activeGameId: gameId });
-  } else {
-    const def = comingSoonGameDefinition(gameId);
-    if (!def) return;
-    setState({
-      games: { ...state.games, [gameId]: def },
-      myFightersByGame: { ...state.myFightersByGame, [gameId]: [] },
-      activeFighterByGame: { ...state.activeFighterByGame, [gameId]: null },
-      activeGameId: gameId,
-    });
-  }
+  setState(patch);
   logDraft = makeLogDraft();
   renderApp();
 }
@@ -207,7 +200,7 @@ function renderComingSoonCard() {
 
 // ---------- キャラ診断 ----------
 function isDiagnosisAvailable() {
-  return state.activeGameId === "ssbu";
+  return state.activeGameId === DIAGNOSIS_GAME_ID;
 }
 
 function startDiagnosis() {
@@ -258,12 +251,8 @@ function closeDiagnosis() {
 
 /** 診断で選んだキャラをマイキャラに加え、自キャラにする。 */
 function makeMyFighter(name) {
-  const gameId = "ssbu";
-  const mine = state.myFightersByGame[gameId] || [];
-  const myFightersByGame = { ...state.myFightersByGame, [gameId]: mine.includes(name) ? mine : [...mine, name] };
-  const activeFighterByGame = { ...state.activeFighterByGame, [gameId]: name };
   diagnosisStatus = `${name}をマイキャラにしました。記録や相性表でも使えます。`;
-  setState({ myFightersByGame, activeFighterByGame, activeGameId: gameId });
+  setState(makeMyFighterPatch(state, name));
   logDraft = makeLogDraft();
 }
 
@@ -280,6 +269,7 @@ function renderDiagnosis() {
     return diagnosisQuiz({ session: diagnosisSession, onAnswer: answerDiagnosis, onBack: backDiagnosis, onQuit: closeDiagnosis });
   }
   const result = diagnose(state.diagnosis.answers);
+  if (!result.picks.length) return diagnosisUnavailable({ onClose: closeDiagnosis });
   const focus = result.picks.some((p) => p.name === diagnosisFocus) ? diagnosisFocus : result.picks[0].name;
   return diagnosisResult({
     result,
@@ -1211,7 +1201,7 @@ function renderGameSection() {
   const gameList = el(
     "ul",
     { className: "game-list" },
-    Object.values(state.games).map((g) =>
+    visibleGames(state.games, { isNative: IS_NATIVE }).map((g) =>
       el("li", { className: "game-item" }, [
         el("span", {}, g.name),
         el("span", { className: "badge" }, g.isPreset ? "プリセット" : isComingSoonGame(g.id, { isNative: IS_NATIVE }) ? "準備中" : "カスタム"),
@@ -1222,7 +1212,7 @@ function renderGameSection() {
   const addGameForm = el("form", { className: "inline-form", onSubmit: onAddGame }, [
     el("input", {
       type: "text",
-      placeholder: "新しいゲーム名（50字まで）",
+      placeholder: "ゲーム名（50字まで）",
       maxlength: MAX_NAME_LEN,
       value: newGameNameDraft,
       onInput: (e) => (newGameNameDraft = e.target.value),
@@ -1301,7 +1291,7 @@ function renderFighterSection() {
   const addFighterForm = el("form", { className: "inline-form", onSubmit: onAddFighter }, [
     el("input", {
       type: "text",
-      placeholder: "キャラ名を追加（50字まで）",
+      placeholder: "キャラ名（50字まで）",
       maxlength: MAX_NAME_LEN,
       value: newFighterNameDraft,
       onInput: (e) => (newFighterNameDraft = e.target.value),
@@ -1492,7 +1482,7 @@ function onImportFile(e) {
       return;
     }
     clearLevelNotice();
-    state = result.data;
+    state = nativeSafeState(result.data, { isNative: IS_NATIVE });
     persist();
     matchupSelected = null;
     diagnosisView = null;
@@ -1523,7 +1513,7 @@ function renderApp() {
   const stages = root.querySelectorAll(".roadmap-stage");
   if (stages.length) openRoadmapStages = new Set([...stages].filter((node) => node.open).map((node) => node.dataset.stage));
   clear(root);
-  if (diagnosisView && (!isDiagnosisAvailable() || (diagnosisView === "result" && !state.diagnosis))) diagnosisView = null;
+  diagnosisView = diagnosisViewFor(diagnosisView, { activeGameId: state.activeGameId, hasResult: Boolean(state.diagnosis) });
   const panel = diagnosisView
     ? renderDiagnosis()
     : currentTab === "home"

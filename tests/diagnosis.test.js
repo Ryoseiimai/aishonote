@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { QUESTIONS, sanitizeDiagnosis, isCompleteAnswers, DIAGNOSIS_VERSION } from "../js/diagnosis-questions.js";
-import { diagnose, typeOf, userVector, charVector, closeness, missingProfiles, answerValues, TYPES, AXES } from "../js/diagnosis.js";
+import { diagnose, typeOf, userVector, charVector, closeness, missingProfiles, answerValues, matchReasons, starsOf, isBalanced, TYPES, AXES, ALL_ROUNDER } from "../js/diagnosis.js";
 import { SSBU_FIGHTER_PROFILES, FIGHTER_RANK_SOURCES } from "../js/presets/ssbu-fighter-profiles.js";
 import { SSBU_FIGHTERS } from "../js/presets/ssbu.js";
 import { SSBU_CHAR_CURRICULUM } from "../js/presets/ssbu-char-curriculum.js";
@@ -97,7 +97,7 @@ test("タイプ判定: 16タイプすべてに名前と説明があり、4軸の
   assert.equal(typeOf(vec(0, 0, 0, 0)).name, "突撃スピードスター");
   assert.equal(typeOf(vec(1, 1, 1, 1)).key, "WFPT");
   assert.equal(typeOf(vec(1, 0, 1, 0)).key, "WNPO");
-  // ちょうど真ん中（どちらでもない）は左の極
+  // キーの決め方は変えない（ちょうど真ん中は左の極）。表示は下の「バランス」のテストで固定する
   assert.equal(typeOf(vec(0.5, 0.5, 0.5, 0.5)).key, "ANSO");
   assert.equal(typeOf(vec(0.51, 0.5, 0.5, 0.5)).key, "WNSO");
   // 全組み合わせのキーが TYPES に存在する
@@ -106,6 +106,33 @@ test("タイプ判定: 16タイプすべてに名前と説明があり、4軸の
     assert.ok(TYPES[t.key], t.key);
     assert.equal(t.axes.length, AXES.length);
   }
+});
+
+test("タイプ判定: 0.4〜0.6の軸は「バランス」表示、4軸ともなら「オールラウンダー」で左の極を名乗らない", () => {
+  const vec = (a, d, p, t) => ({ attack: a, distance: d, power: p, trick: t });
+  assert.equal(isBalanced(0.4), true);
+  assert.equal(isBalanced(0.6), true);
+  assert.equal(isBalanced(0.39), false);
+  assert.equal(isBalanced(0.61), false);
+
+  // 全問「どちらでもない」: バッジは全部バランス、名前はオールラウンダー（突撃スピードスターと断定しない）
+  const neutralType = diagnose(neutral).type;
+  assert.equal(neutralType.allRounder, true);
+  assert.equal(neutralType.name, ALL_ROUNDER.name);
+  assert.notEqual(neutralType.name, TYPES.ANSO.name);
+  assert.deepEqual(neutralType.axes.map((a) => a.balanced), [true, true, true, true]);
+  assert.deepEqual(neutralType.axes.map((a) => a.side), ["攻めと待ちのバランス", "近距離と遠距離のバランス", "スピードとパワーのバランス", "正統派とトリッキーのバランス"]);
+  for (const a of neutralType.axes) assert.ok(!["攻め", "近距離", "スピード", "正統派"].includes(a.side));
+
+  // 一部だけバランス: その軸だけバランス表示で、名前は16タイプのまま
+  const mixed = typeOf(vec(0.1, 0.55, 0.9, 0.45));
+  assert.equal(mixed.allRounder, false);
+  assert.equal(mixed.name, TYPES[mixed.key].name);
+  assert.deepEqual(mixed.axes.map((a) => a.side), ["攻め", "近距離と遠距離のバランス", "パワー", "正統派とトリッキーのバランス"]);
+
+  // 16タイプに賭博を連想させる語を使わない
+  for (const t of Object.values(TYPES)) assert.ok(!/ギャンブ|賭/.test(t.name + t.desc), t.name);
+  assert.equal(TYPES.ANPT.name, "一発逆転チャレンジャー");
 });
 
 test("タイプ判定: 回答から軸が計算される（攻め・近・スピード を選べばその側になる）", () => {
@@ -139,7 +166,16 @@ test("スコア: 初心者と答えると操作がかんたんなキャラ(easy)
   assert.equal(scoreOf(beginner, "ピーチ"), scoreOf(veteran, "ピーチ"));
 });
 
-test("おすすめ: 上位3体・相性%は0〜99・並びはスコア降順で毎回同じ", () => {
+test("おすすめ度: スコアを★1〜3に丸める（0.9以上=3・0.8以上=2・それ未満=1）", () => {
+  assert.equal(starsOf(1), 3);
+  assert.equal(starsOf(0.9), 3);
+  assert.equal(starsOf(0.899), 2);
+  assert.equal(starsOf(0.8), 2);
+  assert.equal(starsOf(0.799), 1);
+  assert.equal(starsOf(0), 1);
+});
+
+test("おすすめ: 上位3体・％は0〜99・★は1〜3・並びはスコア降順で毎回同じ", () => {
   for (const answers of sampleAnswers(300)) {
     const a = diagnose(answers);
     const b = diagnose(JSON.parse(JSON.stringify(answers)));
@@ -150,6 +186,7 @@ test("おすすめ: 上位3体・相性%は0〜99・並びはスコア降順で�
       const p = a.picks[i];
       assert.ok(SSBU_FIGHTERS.includes(p.name));
       assert.ok(Number.isInteger(p.percent) && p.percent >= 0 && p.percent <= 99);
+      assert.equal(p.stars, starsOf(p.score));
       assert.ok(p.reasons.length >= 2 && p.reasons.length <= 3, `${p.name}: ${p.reasons}`);
       if (i > 0) assert.ok(a.picks[i - 1].score >= p.score);
     }
@@ -170,6 +207,53 @@ test("おすすめ: 特徴データが欠けたキャラは候補から外れ、
   const picks = diagnose(neutral, { fighters, profiles }).picks.map((p) => p.name);
   assert.equal(picks.length, 3);
   assert.ok(!picks.includes("C"));
+});
+
+test("おすすめ: 特徴データが1体も無ければ picks は空（画面は「準備中」を出す）", () => {
+  const r = diagnose(neutral, { profiles: {} });
+  assert.deepEqual(r.picks, []);
+  assert.ok(r.type.name);
+});
+
+test("理由: 合成軸の向きではなく元の指標で出す（プリンに「足が速い」、しずえに「重い」を付けない）", () => {
+  const P = SSBU_FIGHTER_PROFILES;
+  const fast = "足が速く素早く動ける";
+  const heavy = "重くて一撃が強い";
+  const combo = "コンボでダメージを稼げる";
+  const kill = "一撃の撃墜力が高い";
+  const gimmick = "このキャラだけの仕掛けがある";
+  // どの回答（スピード寄り・パワー寄りの両極を含む）でも、元の指標に合わない言葉は出ない
+  const users = [
+    ...sampleAnswers(200).map(userVector),
+    ...[0, 1].flatMap((p) => [0, 1].map((d) => ({ attack: 0.5, distance: 0.5, power: p, trick: 0.5, air: 0.5, projectile: 0.5, damage: d, recovery: 0.5 }))),
+  ];
+  for (const name of SSBU_FIGHTERS) {
+    const p = P[name];
+    const c = charVector(p);
+    for (const u of users) {
+      for (const beginner of [false, true]) {
+        const reasons = matchReasons(u, c, p, { beginner });
+        assert.ok(reasons.length >= 2 && reasons.length <= 3, name);
+        if (reasons.includes(fast)) assert.ok(p.speed >= 4, `${name}: speed=${p.speed}`);
+        if (reasons.includes(heavy)) assert.ok(p.weight >= 4 && p.killPower >= 4, `${name}: weight=${p.weight} kill=${p.killPower}`);
+        if (reasons.includes(combo)) assert.ok(p.combo >= 4, `${name}: combo=${p.combo}`);
+        if (reasons.includes(kill)) assert.ok(p.killPower >= 4, `${name}: kill=${p.killPower}`);
+        if (reasons.includes(gimmick)) assert.ok(p.gimmick.trim(), name);
+      }
+    }
+  }
+  // 回帰: レビューで見つかった具体例
+  const speedFan = { ...userVector(neutral), power: 0 };
+  const powerFan = { ...userVector(neutral), power: 1, damage: 1 };
+  for (const name of ["プリン", "ピーチ", "デイジー", "ファルコ", "ソラ"]) {
+    assert.ok(P[name].speed <= 2, name);
+    assert.ok(!matchReasons(speedFan, charVector(P[name]), P[name]).includes(fast), name);
+  }
+  assert.ok(!matchReasons(powerFan, charVector(P["しずえ"]), P["しずえ"]).includes(heavy));
+  // 正しく当てはまるキャラには出る（ソニック=最速、クッパ=重くて撃墜力が高い）
+  assert.ok(matchReasons(speedFan, charVector(P["ソニック"]), P["ソニック"]).includes(fast));
+  assert.ok(P["クッパ"].weight >= 4 && P["クッパ"].killPower >= 4);
+  assert.ok(matchReasons(powerFan, charVector(P["クッパ"]), P["クッパ"]).includes(heavy));
 });
 
 test("おすすめ: 回答しだいで全86体のどのキャラも候補に上がりうる", () => {
