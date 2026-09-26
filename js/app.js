@@ -10,6 +10,7 @@ import { experience } from "./progression.js";
 import { guideCard, pixelIcon, levelNotice } from "./pixel-view.js";
 import { shouldShowBirthday, birthdayDismissalPatch } from "./birthday.js";
 import { showBirthday } from "./birthday-view.js";
+import { consumeGiftLink } from "./gift-link.js";
 import {
   stageRate,
   overallRate,
@@ -49,6 +50,11 @@ const TAB_LABELS = { home: "ホーム", log: "記録", growth: "上達", matchup
 const APP_VERSION = "1.0"; // ios/App の MARKETING_VERSION と合わせる
 
 let state = loadState();
+try {
+  state = consumeGiftLink(state);
+} catch {
+  showAlert("プレゼント用リンクを処理できませんでした。設定のお祝いの名前を確認してください。");
+}
 let currentTab = "home";
 let logDraft = makeLogDraft();
 let matchupSelected = null; // 相性タブで編集中の相手キャラ
