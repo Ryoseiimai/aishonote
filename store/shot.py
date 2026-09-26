@@ -1,7 +1,7 @@
-# 相性ノートの画面確認用スクリーンショット（Playwright WebKit・1290x2796）。
-# App Store に出す画像は store/sim_shot.py（iOSシミュレータの実機描画・ステータスバー付き）で撮る。これはその下見と
-# Web版の確認用で、出力は build/web-shots/（コミットしない）。シードデータ build_state() は sim_shot.py も使う。
-# 使い方: python3 store/shot.py  （リポジトリ直下を自前の一時HTTPサーバーで配信して撮る）
+# 相性ノートのスクリーンショット（Playwright WebKit・1290x2796）。シードデータ build_state() は sim_shot.py も使う。
+# 使い方: python3 store/shot.py  （リポジトリ直下を自前の一時HTTPサーバーで配信して撮る。出力は build/web-shots/・コミットしない）
+#         python3 store/shot.py --out store/screenshots  （build 4 以降の App Store 用5枚。ステータスバーは無い）
+# 注: store/sim_shot.py は build 3 までの4枚構成（上達タブ・むすびコーチ以前）のまま。使うなら撮る画面を合わせてから。
 # iPhone相当の 430x932 CSS px を 3倍で撮る＝1290x2796。レンダラは iOS と同系の WebKit。
 # ビューポート撮影（fullPage ではない）。固定の下タブがカードを中途半端に切らないよう各画面でスクロール位置を調整する。
 # App Store 用は iOS アプリの見た目で撮るため window.Capacitor.isNativePlatform() を true にする（相性の目安はリンク案内になる）。
@@ -83,6 +83,9 @@ def build_state():
         f"{GAME}__{ACTIVE}__フォックス": {"mark": "good", "memo": ""},
         f"{GAME}__{ACTIVE}__勇者": {"mark": "bad", "memo": ""},
     }
+    # 上達タブ用: 操作に慣れる5項目＋ネス専用2項目にチェック、直近4日の練習（今日を含む）→ Lv.3 前後になる。
+    progress = ["op-short-hop", "op-shff", "op-fast-fall", "op-di", "op-ledge-options", "ness-forward-air", "ness-pk-fire"]
+    practice_log = {(today - timedelta(days=i)).isoformat(): m for i, m in enumerate([30, 10, 30, 20])}
     return {
         "version": 2,
         "games": {
@@ -98,6 +101,8 @@ def build_state():
         "activeFighterByGame": {GAME: ACTIVE},
         "matches": matches,
         "matchups": matchups,
+        "progress": progress,
+        "practiceLog": practice_log,
     }
 
 
@@ -128,6 +133,17 @@ def scroll_bottom_to(page, selector, gap=16):
           const node = document.querySelector(sel);
           const navTop = document.querySelector('nav.bottom-nav').getBoundingClientRect().top;
           window.scrollTo(0, window.scrollY + node.getBoundingClientRect().bottom - (navTop - gap));
+        }""",
+        [selector, gap],
+    )
+
+
+def scroll_top_to(page, selector, gap=12):
+    """selector の要素の上端が画面上端から gap px 下に来るようスクロールする。"""
+    page.evaluate(
+        """([sel, gap]) => {
+          const node = document.querySelector(sel);
+          window.scrollTo(0, window.scrollY + node.getBoundingClientRect().top - gap);
         }""",
         [selector, gap],
     )
@@ -164,7 +180,11 @@ def shot(page, name):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--web-matchup", help="Web版（注入なし）の相性タブだけをこのパスに撮る")
+    ap.add_argument("--out", help="iOS表示5枚の出力先（既定 build/web-shots/）")
     args = ap.parse_args()
+    global OUTDIR
+    if args.out:
+        OUTDIR = os.path.abspath(args.out)
 
     srv, url = start_server()
     out = []
@@ -181,11 +201,16 @@ def main():
             else:
                 page, errors = open_app(browser, url, native=True)
 
-                # 01 ホーム（ヘッダーから見える一番上の位置）
+                # 01 ホーム（むすびコーチとレベル。ヘッダーから見える一番上の位置）
                 page.evaluate("window.scrollTo(0, 0)")
                 out.append(shot(page, "01_home.png"))
 
-                # 02 記録（負け理由のタグが見える状態）
+                # 02 上達（今日の練習カードの頭から、その下のロードマップ4段階まで見せる）
+                click_tab(page, "上達")
+                scroll_top_to(page, ".card:has(.duration-buttons)", 12)
+                out.append(shot(page, "02_growth.png"))
+
+                # 03 記録（負け理由のタグが見える状態）
                 click_tab(page, "記録")
                 page.locator(".log-form select").nth(1).select_option("パックマン")
                 page.check("input[type=radio][value=lose]")
@@ -193,21 +218,18 @@ def main():
                 page.check("label.tag-checkbox:has-text('復帰阻止された') input")
                 page.check("label.tag-checkbox:has-text('飛び道具に触れない') input")
                 page.wait_for_timeout(200)
-                out.append(shot(page, "02_log.png"))
+                out.append(shot(page, "03_log.png"))
 
-                # 03 相性（出典へのリンク案内カード＋自分の相性表）
+                # 04 相性（出典へのリンク案内カード＋自分の相性表）
                 click_tab(page, "相性")
                 page.wait_for_selector("a.ref-link-btn")
                 assert page.locator(".ref-matchup-columns").count() == 0, "iOS表示で同梱データが出ている"
-                out.append(shot(page, "03_matchup.png"))
+                out.append(shot(page, "04_matchup.png"))
 
-                # 04 設定（データカード＋「このアプリについて」カード。about の下端を下タブの少し上に揃える）
-                click_tab(page, "設定")
-                scroll_bottom_to(page, ".about-card")
-                assert page.evaluate(
-                    "() => getComputedStyle(document.querySelector('.file-label input')).opacity"
-                ) == "0", "英語の Choose File が見えている"
-                out.append(shot(page, "04_settings.png"))
+                # 05 上達のキャラ専用メニュー（ネス）
+                click_tab(page, "上達")
+                scroll_top_to(page, ".character-menu", 12)
+                out.append(shot(page, "05_character.png"))
 
             browser.close()
             if errors:
