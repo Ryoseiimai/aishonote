@@ -7,7 +7,11 @@ import { SHIRATSUKI_URL, PRIVACY_POLICY_URL } from "./external-links.js";
 import { SSBU_CURRICULUM } from "./presets/ssbu-curriculum.js";
 import { characterMenuView } from "./char-curriculum-display.js";
 import { experience } from "./progression.js";
-import { guideCard, pixelIcon, levelNotice } from "./pixel-view.js";
+import { guideCard, pixelIcon, levelNotice, coachSay } from "./pixel-view.js";
+import { QUESTIONS, DIAGNOSIS_VERSION, isCompleteAnswers } from "./diagnosis-questions.js";
+import { diagnose } from "./diagnosis.js";
+import { diagnosisEntryCard, diagnosisQuiz, diagnosisResult } from "./diagnosis-view.js";
+import { gameMenuEntries, isComingSoonGame, comingSoonGameDefinition, COMING_SOON_NOTICE } from "./games.js";
 import { shouldShowBirthday, birthdayDismissalPatch } from "./birthday.js";
 import { showBirthday } from "./birthday-view.js";
 import { consumeGiftLink } from "./gift-link.js";
@@ -70,6 +74,14 @@ let growthTimerId = null;
 let growthStepChecks = []; // ステップごとのチェック(表示用。記録は分数だけ)
 let termQuery = ""; // 用語辞典の検索語
 let openRoadmapStages = new Set();
+
+// ---------- キャラ診断(画面内だけの状態。回答は終わったときに state.diagnosis へ保存) ----------
+let diagnosisView = null; // null | "quiz" | "result"
+let diagnosisSession = null; // { step, answers }
+let diagnosisFocus = null; // 「どうやって上達するか」を出すキャラ
+let diagnosisStatus = "";
+let growthMenuFighter = null; // 診断から開いたキャラ専用メニュー(マイキャラ以外も見られる)
+let scrollTarget = null; // 描画後にスクロールする要素のセレクタ
 
 const root = document.getElementById("app");
 // 通常の再描画やタイマー更新で演出を繰り返さない、独立した通知領域。
@@ -153,24 +165,158 @@ function setState(patch) {
 
 function switchTab(tab) {
   currentTab = tab;
+  diagnosisView = null;
+  growthMenuFighter = null;
   renderApp();
+  window.scrollTo(0, 0);
+}
+
+/** ゲームを切り替える。まだ保存していない準備中のゲームは、選んだときに普通のゲームとして追加する。 */
+function selectGame(gameId) {
+  matchupSelected = null;
+  diagnosisView = null;
+  growthMenuFighter = null;
+  if (state.games[gameId]) {
+    setState({ activeGameId: gameId });
+  } else {
+    const def = comingSoonGameDefinition(gameId);
+    if (!def) return;
+    setState({
+      games: { ...state.games, [gameId]: def },
+      myFightersByGame: { ...state.myFightersByGame, [gameId]: [] },
+      activeFighterByGame: { ...state.activeFighterByGame, [gameId]: null },
+      activeGameId: gameId,
+    });
+  }
+  logDraft = makeLogDraft();
+  renderApp();
+}
+
+function isComingSoon() {
+  return isComingSoonGame(state.activeGameId, { isNative: IS_NATIVE });
+}
+
+/** 準備中のゲームを選んでいるときに各タブの先頭へ出す案内。 */
+function renderComingSoonCard() {
+  if (!isComingSoon()) return null;
+  return el("div", { className: "card coming-soon" }, [
+    el("h2", {}, "準備中"),
+    coachSay(`${COMING_SOON_NOTICE}。`, "idle"),
+  ]);
+}
+
+// ---------- キャラ診断 ----------
+function isDiagnosisAvailable() {
+  return state.activeGameId === "ssbu";
+}
+
+function startDiagnosis() {
+  diagnosisSession = { step: 0, answers: {} };
+  diagnosisStatus = "";
+  diagnosisView = "quiz";
+  renderApp();
+  window.scrollTo(0, 0);
+}
+
+function showDiagnosisResult() {
+  if (!state.diagnosis) return;
+  diagnosisFocus = null;
+  diagnosisStatus = "";
+  diagnosisView = "result";
+  renderApp();
+  window.scrollTo(0, 0);
+}
+
+function answerDiagnosis(questionId, optionIndex) {
+  const answers = { ...diagnosisSession.answers, [questionId]: optionIndex };
+  if (diagnosisSession.step < QUESTIONS.length - 1) {
+    diagnosisSession = { step: diagnosisSession.step + 1, answers };
+    renderApp();
+    return;
+  }
+  if (!isCompleteAnswers(answers)) return;
+  diagnosisSession = null;
+  diagnosisFocus = null;
+  diagnosisView = "result";
+  setState({ diagnosis: { version: DIAGNOSIS_VERSION, answers, date: todayStr() } });
+  window.scrollTo(0, 0);
+}
+
+function backDiagnosis() {
+  if (diagnosisSession && diagnosisSession.step > 0) {
+    diagnosisSession = { ...diagnosisSession, step: diagnosisSession.step - 1 };
+    renderApp();
+  }
+}
+
+function closeDiagnosis() {
+  diagnosisView = null;
+  diagnosisSession = null;
+  renderApp();
+  window.scrollTo(0, 0);
+}
+
+/** 診断で選んだキャラをマイキャラに加え、自キャラにする。 */
+function makeMyFighter(name) {
+  const gameId = "ssbu";
+  const mine = state.myFightersByGame[gameId] || [];
+  const myFightersByGame = { ...state.myFightersByGame, [gameId]: mine.includes(name) ? mine : [...mine, name] };
+  const activeFighterByGame = { ...state.activeFighterByGame, [gameId]: name };
+  diagnosisStatus = `${name}をマイキャラにしました。記録や相性表でも使えます。`;
+  setState({ myFightersByGame, activeFighterByGame, activeGameId: gameId });
+  logDraft = makeLogDraft();
+}
+
+function openCharacterMenuFor(name) {
+  diagnosisView = null;
+  currentTab = "growth";
+  growthMenuFighter = name === state.activeFighterByGame[state.activeGameId] ? null : name;
+  scrollTarget = ".character-menu";
+  renderApp();
+}
+
+function renderDiagnosis() {
+  if (diagnosisView === "quiz" && diagnosisSession) {
+    return diagnosisQuiz({ session: diagnosisSession, onAnswer: answerDiagnosis, onBack: backDiagnosis, onQuit: closeDiagnosis });
+  }
+  const result = diagnose(state.diagnosis.answers);
+  const focus = result.picks.some((p) => p.name === diagnosisFocus) ? diagnosisFocus : result.picks[0].name;
+  return diagnosisResult({
+    result,
+    focus,
+    focusMenu: characterMenuView("ssbu", focus, new Set(state.progress)),
+    roadmapStep: nextStep(SSBU_CURRICULUM.roadmap, new Set(state.progress)),
+    activeFighter: state.activeFighterByGame.ssbu,
+    status: diagnosisStatus,
+    date: state.diagnosis.date,
+    onFocus: (name) => {
+      diagnosisFocus = name;
+      renderApp();
+    },
+    onMakeMine: makeMyFighter,
+    onOpenMenu: openCharacterMenuFor,
+    onRetry: startDiagnosis,
+    onClose: closeDiagnosis,
+  });
+}
+
+function renderDiagnosisEntry({ compact }) {
+  if (!isDiagnosisAvailable()) return null;
+  return diagnosisEntryCard({ hasResult: Boolean(state.diagnosis), compact, onStart: startDiagnosis, onShowResult: showDiagnosisResult });
 }
 
 // ---------- ヘッダー ----------
 function renderHeader() {
-  const gameIds = Object.keys(state.games);
   const gameSelect = el(
     "select",
     {
       className: "game-select",
       "aria-label": "ゲーム切替",
-      onChange: (e) => {
-        matchupSelected = null;
-        setState({ activeGameId: e.target.value });
-        logDraft = makeLogDraft();
-      },
+      onChange: (e) => selectGame(e.target.value),
     },
-    gameIds.map((id) => el("option", { value: id, selected: id === state.activeGameId }, state.games[id].name))
+    gameMenuEntries(state.games, { isNative: IS_NATIVE }).map((g) =>
+      el("option", { value: g.id, selected: g.id === state.activeGameId }, g.label)
+    )
   );
 
   const myFighters = state.myFightersByGame[state.activeGameId] || [];
@@ -227,10 +373,14 @@ function renderHome() {
   const my = state.activeFighterByGame[gameId];
   if (!my) {
     return el("section", { className: "panel" }, [
-      renderNextStepCard(),
+      renderComingSoonCard(),
+      renderDiagnosisEntry({ compact: false }),
+      isComingSoon() ? null : renderNextStepCard(),
       renderPracticeStatusCard(),
       el("div", { className: "card" }, [
-        el("p", {}, "まず「設定」タブでマイキャラを選び、自キャラを切り替えてください。"),
+        el("p", {}, isComingSoon()
+          ? "「設定」タブでキャラ名を追加してマイキャラに選ぶと、記録と相性表が使えます。"
+          : "まず「設定」タブでマイキャラを選び、自キャラを切り替えてください。"),
       ]),
     ]);
   }
@@ -321,7 +471,8 @@ function renderHome() {
   ]);
 
   return el("section", { className: "panel" }, [
-    renderNextStepCard(),
+    renderComingSoonCard(),
+    isComingSoon() ? null : renderNextStepCard(),
     renderPracticeStatusCard(),
     homeworkSection,
     weakSection,
@@ -569,7 +720,8 @@ function renderRoadmap() {
 }
 
 function renderCharacterMenu() {
-  const my = state.activeFighterByGame[state.activeGameId];
+  const active = state.activeFighterByGame[state.activeGameId];
+  const my = growthMenuFighter || active;
   const progressSet = new Set(state.progress);
   const menu = characterMenuView(state.activeGameId, my, progressSet);
   const body = menu
@@ -591,8 +743,24 @@ function renderCharacterMenu() {
         ]),
       ]
     : [el("p", { className: "hint" }, "このキャラ専用メニューは準備中です。")];
+  const fromDiagnosis = growthMenuFighter
+    ? el("div", { className: "diag-preview" }, [
+        el("p", { className: "hint" }, "キャラ診断から表示しています。マイキャラにすると、記録や相性表でも使えます。"),
+        el("div", { className: "pick-actions" }, [
+          el("button", { type: "button", className: "primary-btn", onClick: () => {
+            growthMenuFighter = null;
+            makeMyFighter(my);
+          } }, "マイキャラにする"),
+          el("button", { type: "button", className: "secondary-btn", onClick: () => {
+            growthMenuFighter = null;
+            renderApp();
+          } }, active ? `${active}のメニューに戻す` : "閉じる"),
+        ]),
+      ])
+    : null;
   return el("div", { className: "card character-menu" }, [
     el("h2", {}, `キャラ専用メニュー${my ? `（${my}）` : ""}`),
+    fromDiagnosis,
     ...body,
   ]);
 }
@@ -665,6 +833,7 @@ function renderCurriculumSources() {
 }
 
 function renderGrowth() {
+  if (isComingSoon()) return el("section", { className: "panel" }, [renderComingSoonCard()]);
   return el("section", { className: "panel" }, [
     renderNextStepCard(),
     renderTodayPractice(),
@@ -732,6 +901,7 @@ function renderLog() {
   const list = el("ul", { className: "match-list" }, sortByDateDesc(gameMatches).map((m) => renderMatchItem(m)));
 
   return el("section", { className: "panel" }, [
+    renderComingSoonCard(),
     el("div", { className: "card" }, [el("h2", {}, "対戦を記録"), fighters.length === 0 ? el("p", { className: "hint" }, "設定でキャラを追加してください。") : form]),
     el("div", { className: "card" }, [el("h2", {}, "対戦一覧"), gameMatches.length === 0 ? el("p", { className: "hint" }, "まだ記録がありません。") : list]),
   ]);
@@ -890,7 +1060,7 @@ function renderMatchup() {
   const gameId = state.activeGameId;
   const my = state.activeFighterByGame[gameId];
   if (!my) {
-    return el("section", { className: "panel" }, [el("p", {}, "設定でマイキャラと自キャラを選んでください。")]);
+    return el("section", { className: "panel" }, [renderComingSoonCard(), el("p", {}, "設定でマイキャラと自キャラを選んでください。")]);
   }
   const fighters = fightersOf(state.games[gameId]);
   const myMatches = state.matches.filter((m) => m.gameId === gameId && m.my === my);
@@ -947,6 +1117,7 @@ function renderMatchup() {
   const editor = matchupSelected ? renderMatchupEditor(gameId, my, matchupSelected) : null;
 
   return el("section", { className: "panel" }, [
+    renderComingSoonCard(),
     referenceCard,
     el("div", { className: "card" }, [el("h2", {}, `相性表（${my}）`), el("p", { className: "hint" }, "苦手順に並んでいます。タップすると印とメモを編集できます。"), list]),
     editor,
@@ -1024,8 +1195,11 @@ function renderMatchupEditor(gameId, my, opponent) {
 
 // ---------- 設定 ----------
 function renderSettings() {
+  const hasMine = (state.myFightersByGame[state.activeGameId] || []).length > 0;
   return el("section", { className: "panel" }, [
+    renderComingSoonCard(),
     renderGameSection(),
+    renderDiagnosisEntry({ compact: hasMine }),
     renderFighterSection(),
     renderDataSection(),
     renderAboutSection(),
@@ -1040,7 +1214,7 @@ function renderGameSection() {
     Object.values(state.games).map((g) =>
       el("li", { className: "game-item" }, [
         el("span", {}, g.name),
-        g.isPreset ? el("span", { className: "badge" }, "プリセット") : el("span", { className: "badge" }, "カスタム"),
+        el("span", { className: "badge" }, g.isPreset ? "プリセット" : isComingSoonGame(g.id, { isNative: IS_NATIVE }) ? "準備中" : "カスタム"),
       ])
     )
   );
@@ -1321,6 +1495,8 @@ function onImportFile(e) {
     state = result.data;
     persist();
     matchupSelected = null;
+    diagnosisView = null;
+    growthMenuFighter = null;
     logDraft = makeLogDraft();
     renderApp();
     e.target.value = "";
@@ -1335,6 +1511,8 @@ async function onEraseAll() {
   state = emptyState();
   persist();
   matchupSelected = null;
+  diagnosisView = null;
+  growthMenuFighter = null;
   logDraft = makeLogDraft();
   renderApp();
 }
@@ -1345,8 +1523,10 @@ function renderApp() {
   const stages = root.querySelectorAll(".roadmap-stage");
   if (stages.length) openRoadmapStages = new Set([...stages].filter((node) => node.open).map((node) => node.dataset.stage));
   clear(root);
-  const panel =
-    currentTab === "home"
+  if (diagnosisView && (!isDiagnosisAvailable() || (diagnosisView === "result" && !state.diagnosis))) diagnosisView = null;
+  const panel = diagnosisView
+    ? renderDiagnosis()
+    : currentTab === "home"
       ? renderHome()
       : currentTab === "log"
       ? renderLog()
@@ -1359,6 +1539,11 @@ function renderApp() {
   root.appendChild(renderHeader());
   root.appendChild(panel);
   root.appendChild(renderBottomNav());
+  if (scrollTarget) {
+    const target = root.querySelector(scrollTarget);
+    scrollTarget = null;
+    if (target) target.scrollIntoView({ block: "start" });
+  }
 }
 
 renderApp();

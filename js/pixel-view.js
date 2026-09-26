@@ -34,6 +34,18 @@ export function xpBar(stats) {
   })));
 }
 
+/** むすびコーチの顔と吹き出し。mood は "idle"（待機）か "joy"（喜び）。 */
+export function coachSay(message, mood = "idle") {
+  return el("div", { className: "guide-conversation" }, [
+    el("div", { className: "guide-portrait" }, [
+      el("div", { className: `guide-sprite ${mood}`, role: "img", "aria-label": "むすびコーチ（おにぎり型のオリジナルキャラ）：白い三角の体に赤い鉢巻き、下半分に黒いのり。点目とにっこり口で、小さな手をガッツポーズ" },
+        GUIDE_FRAMES[mood].map((frame, i) => pixelSprite(frame, `pixel-frame frame-${i}`))),
+      el("span", { className: "guide-name" }, "むすびコーチ"),
+    ]),
+    el("p", { className: "guide-bubble" }, message),
+  ]);
+}
+
 export function guideCard({ stats, step, streak, levelUp = false, onNext = null }) {
   const mood = levelUp || streak > 0 || !step ? "joy" : "idle";
   return el("div", { className: "card guide-card" }, [
@@ -41,14 +53,7 @@ export function guideCard({ stats, step, streak, levelUp = false, onNext = null 
       el("h2", {}, "きょうも、一歩ずつ。"),
       el("span", { className: "guide-level" }, [pixelIcon("trophy"), `Lv.${stats.level}`]),
     ]),
-    el("div", { className: "guide-conversation" }, [
-      el("div", { className: "guide-portrait" }, [
-        el("div", { className: `guide-sprite ${mood}`, role: "img", "aria-label": "むすびコーチ（おにぎり型のオリジナルキャラ）：白い三角の体に赤い鉢巻き、下半分に黒いのり。点目とにっこり口で、小さな手をガッツポーズ" },
-          GUIDE_FRAMES[mood].map((frame, i) => pixelSprite(frame, `pixel-frame frame-${i}`))),
-        el("span", { className: "guide-name" }, "むすびコーチ"),
-      ]),
-      el("p", { className: "guide-bubble" }, guideMessage({ hasNext: Boolean(step), streak, levelUp })),
-    ]),
+    coachSay(guideMessage({ hasNext: Boolean(step), streak, levelUp }), mood),
     xpBar(stats),
     el("p", { className: "xp-caption" }, stats.maxed ? `Lv.99 達成 · 累計 ${stats.xp} XP` : `次のLvまで ${stats.remaining} XP · 累計 ${stats.xp} XP`),
     el("details", { className: "xp-help" }, [
