@@ -1,6 +1,6 @@
 // 自動生成・scripts/fetch-videos.mjs で再生成。手編集しないこと。
 // YouTube Data API で取得したキャラ別解説動画。URLは持たず videoId のみ(CIの外部URL検査を増やさないため)。
-// 取得日(JST): 2026-09-30
+// 取得日(JST): 2026-10-01
 export const VIDEO_LINKS = {
   "マリオ": [
     {
@@ -26,7 +26,7 @@ export const VIDEO_LINKS = {
     },
     {
       "id": "m3Ad0geR4Vk",
-      "title": "【全キャラ解説】&quot;今日から勝てる&quot;マリオの最強行動教えます!!【スマブラSP】",
+      "title": "【全キャラ解説】\"今日から勝てる\"マリオの最強行動教えます!!【スマブラSP】",
       "channel": "Zackray / ザクレイ",
       "published": "2022-08-18",
       "pinned": false
@@ -56,7 +56,7 @@ export const VIDEO_LINKS = {
     },
     {
       "id": "MYuaTeAkaRM",
-      "title": "【全キャラ解説】技はどれも優秀ドンキー！＆最強テクニック&quot;オートキャンセル&quot;について",
+      "title": "【全キャラ解説】技はどれも優秀ドンキー！＆最強テクニック\"オートキャンセル\"について",
       "channel": "Zackray / ザクレイ",
       "published": "2022-08-23",
       "pinned": false
@@ -374,6 +374,34 @@ export const VIDEO_LINKS = {
   ],
   "ネス": [
     {
+      "id": "rY74_UTt5F8",
+      "title": "ネス使い必見！空上のすっぽ抜けを利用したコンボや撃墜択を解説するがくと【スマブラSP】",
+      "channel": "マイスターG",
+      "published": "2026-09-06",
+      "pinned": true
+    },
+    {
+      "id": "oBvk6zI1eI4",
+      "title": "踏みからPKファイヤー確定！？最近再び開拓が進んだネスの激ムズ最強踏みコンボを知るがくと【スマブラSP】",
+      "channel": "マイスターG",
+      "published": "2026-04-24",
+      "pinned": true
+    },
+    {
+      "id": "exH5kJKaeY4",
+      "title": "ネスの貴重なコンボ、“ダウン連”について詳しくお話ししちゃいます【スマブラSP】",
+      "channel": "マイスターG",
+      "published": "2021-10-13",
+      "pinned": true
+    },
+    {
+      "id": "53rb0wZ3VG0",
+      "title": "心剣ゼミ#8『ネス』前編　先生:Gackt",
+      "channel": "心剣  -SSBU SHINKEN CHANNEL-",
+      "published": "2023-11-01",
+      "pinned": false
+    },
+    {
       "id": "DrZndkvwqHY",
       "title": "世界一わかりやすい！初心者向けネス・技＆コンボ講座【スマブラSP】",
       "channel": "アクセル",
@@ -385,27 +413,6 @@ export const VIDEO_LINKS = {
       "title": "【スマブラSP】３分で分かるVIP解説講座【ネス編】",
       "channel": "きのブラ",
       "published": "2024-06-23",
-      "pinned": false
-    },
-    {
-      "id": "RMEEjVnc0B0",
-      "title": "本当に頭を使いたくない人向けのネス解説【スマブラSP】",
-      "channel": "マイスターG",
-      "published": "2019-01-02",
-      "pinned": false
-    },
-    {
-      "id": "53rb0wZ3VG0",
-      "title": "心剣ゼミ#8『ネス』前編　先生:Gackt",
-      "channel": "心剣  -SSBU SHINKEN CHANNEL-",
-      "published": "2023-11-01",
-      "pinned": false
-    },
-    {
-      "id": "ERQYm2dMABc",
-      "title": "【スマブラSP】VIPに行くためにはこの技を振れ！ネス編",
-      "channel": "とくろーちゃんねる",
-      "published": "2025-04-04",
       "pinned": false
     }
   ],
@@ -634,7 +641,7 @@ export const VIDEO_LINKS = {
   "シーク": [
     {
       "id": "9rCUAw5SCD0",
-      "title": "【スマブラ塾】シーク&quot;初級編&quot;徹底解説！",
+      "title": "【スマブラ塾】シーク\"初級編\"徹底解説！",
       "channel": "プロトバナムチャンネル【スマブラSP】",
       "published": "2025-07-27",
       "pinned": false
@@ -840,7 +847,7 @@ export const VIDEO_LINKS = {
     },
     {
       "id": "T3vty-nnyLc",
-      "title": "マルスを使い始めてたった1ヶ月で世界戦闘力&quot;神&quot;に到達するプロトバナム【スマブラSP】",
+      "title": "マルスを使い始めてたった1ヶ月で世界戦闘力\"神\"に到達するプロトバナム【スマブラSP】",
       "channel": "プロトバナムチャンネル【スマブラSP】",
       "published": "2026-02-27",
       "pinned": false
@@ -981,7 +988,7 @@ export const VIDEO_LINKS = {
     },
     {
       "id": "6w7njsu3Yds",
-      "title": "絶対に上手くなれるミュウツーの立ち回り解説&amp;講座｜序盤編｜【スマブラSP】",
+      "title": "絶対に上手くなれるミュウツーの立ち回り解説&講座｜序盤編｜【スマブラSP】",
       "channel": "紫闇ヘルのゲームちゃんねる。【ヘルアン】",
       "published": "2021-04-05",
       "pinned": false
@@ -1085,7 +1092,7 @@ export const VIDEO_LINKS = {
     },
     {
       "id": "s0EFiP3D_2Q",
-      "title": "【スマブラSP】Mr.Game&amp;Watch技解説 地上技編【Part1】",
+      "title": "【スマブラSP】Mr.Game&Watch技解説 地上技編【Part1】",
       "channel": "にあふじ",
       "published": "2025-03-18",
       "pinned": false
@@ -1196,7 +1203,7 @@ export const VIDEO_LINKS = {
     },
     {
       "id": "YY67g1g4dW8",
-      "title": "VIPでも余裕で勝てるブラックピット（ピット）の立ち回りを解説&amp;実況！【スマブラSP】",
+      "title": "VIPでも余裕で勝てるブラックピット（ピット）の立ち回りを解説&実況！【スマブラSP】",
       "channel": "しょーおぶざでっど 【声のプロによるゲーム実況】",
       "published": "2018-12-18",
       "pinned": false
@@ -1559,7 +1566,7 @@ export const VIDEO_LINKS = {
   "ピクミン&オリマー": [
     {
       "id": "nkHVErHbuXo",
-      "title": "【スマブラSP】圧倒的スマブラ力で第一線を走り続ける世界最強ピクオリが超絶プレーを魅せる【しゅーとん ピクミン&amp;オリマー/ハイライト】",
+      "title": "【スマブラSP】圧倒的スマブラ力で第一線を走り続ける世界最強ピクオリが超絶プレーを魅せる【しゅーとん ピクミン&オリマー/ハイライト】",
       "channel": "破壊兄弟【スマブラSP】",
       "published": "2025-02-08",
       "pinned": false
@@ -1580,7 +1587,7 @@ export const VIDEO_LINKS = {
     },
     {
       "id": "gSxtVDBCEGo",
-      "title": "これでVIP入り！？ピクミン&amp;オリマーの基礎を徹底解説！【スマブラSP】",
+      "title": "これでVIP入り！？ピクミン&オリマーの基礎を徹底解説！【スマブラSP】",
       "channel": "しゅーとんちゃんねる",
       "published": "2018-12-25",
       "pinned": false
@@ -1855,14 +1862,14 @@ export const VIDEO_LINKS = {
   "ロゼッタ&チコ": [
     {
       "id": "Ec9Ze5TKuYA",
-      "title": "【ゆっくり解説】ロゼッタ&amp;チコ 徹底解説!!【スマブラSP】",
+      "title": "【ゆっくり解説】ロゼッタ&チコ 徹底解説!!【スマブラSP】",
       "channel": "のんびり丸ch",
       "published": "2019-11-04",
       "pinned": false
     },
     {
       "id": "M6CQT5M1JGk",
-      "title": "【スマブラSP】何をやっているか理解不能!?異次元な動きから超絶テクニックを魅せる最上位ロゼチコ【やまD ロゼッタ&amp;チコ/ハイライト】",
+      "title": "【スマブラSP】何をやっているか理解不能!?異次元な動きから超絶テクニックを魅せる最上位ロゼチコ【やまD ロゼッタ&チコ/ハイライト】",
       "channel": "破壊兄弟【スマブラSP】",
       "published": "2024-12-20",
       "pinned": false
@@ -1883,7 +1890,7 @@ export const VIDEO_LINKS = {
     },
     {
       "id": "AP2yZlwu5-A",
-      "title": "1分でわかる全キャラ解説「ロゼッタ&amp;チコ編」#shorts #スマブラSP #全キャラ解説 #ロゼチコ",
+      "title": "1分でわかる全キャラ解説「ロゼッタ&チコ編」#shorts #スマブラSP #全キャラ解説 #ロゼチコ",
       "channel": "アンダーウルフ【スマブラ解説】",
       "published": "2026-03-12",
       "pinned": false
@@ -2054,7 +2061,7 @@ export const VIDEO_LINKS = {
     },
     {
       "id": "8wR6A5VMofw",
-      "title": "【スマブラfor&amp;SP】射撃Miiカスタム技大解説",
+      "title": "【スマブラfor&SP】射撃Miiカスタム技大解説",
       "channel": "スマブラの歴史(ムタマ)",
       "published": "2020-08-28",
       "pinned": false
@@ -2313,7 +2320,7 @@ export const VIDEO_LINKS = {
     },
     {
       "id": "VBy4_21CgyY",
-      "title": "【初心者必見】世界最強リュウ使い&quot;あしも&quot;のリュウ使い方講座 -前編-【スマブラSP】",
+      "title": "【初心者必見】世界最強リュウ使い\"あしも\"のリュウ使い方講座 -前編-【スマブラSP】",
       "channel": "あしも / Asimo",
       "published": "2026-08-09",
       "pinned": false
@@ -2743,7 +2750,7 @@ export const VIDEO_LINKS = {
   "パックンフラワー": [
     {
       "id": "BUnjugIB6ys",
-      "title": "使い手しか知らない専用テクを取り入れたパックンフラワーが強すぎる！この&quot;株&quot;、今が買い時です【スマブラSP】",
+      "title": "使い手しか知らない専用テクを取り入れたパックンフラワーが強すぎる！この\"株\"、今が買い時です【スマブラSP】",
       "channel": "Raitoのスマブラ生活",
       "published": "2025-06-03",
       "pinned": false
@@ -2854,7 +2861,7 @@ export const VIDEO_LINKS = {
   "バンジョー&カズーイ": [
     {
       "id": "D-1suPyyQ60",
-      "title": "【スマブラSP】バンジョー&amp;カズーイのつかいかた",
+      "title": "【スマブラSP】バンジョー&カズーイのつかいかた",
       "channel": "Nintendo 公式チャンネル",
       "published": "2019-09-04",
       "pinned": false
@@ -2882,7 +2889,7 @@ export const VIDEO_LINKS = {
     },
     {
       "id": "NyEVD8zsXko",
-      "title": "【スマブラSP】ピタゴラスイッチのような芸術的コンボを魅せる世界最強バンカズ【TG(トリグリ) バンジョー&amp;カズーイ/ハイライト/#2】",
+      "title": "【スマブラSP】ピタゴラスイッチのような芸術的コンボを魅せる世界最強バンカズ【TG(トリグリ) バンジョー&カズーイ/ハイライト/#2】",
       "channel": "破壊兄弟【スマブラSP】",
       "published": "2025-03-14",
       "pinned": false
@@ -2942,7 +2949,7 @@ export const VIDEO_LINKS = {
     },
     {
       "id": "eFDatzKlAX0",
-      "title": "全キャラVIPによる誰でも簡単にVIPになれるベレス&amp;ベレト徹底解説【スマブラSP】",
+      "title": "全キャラVIPによる誰でも簡単にVIPになれるベレス&ベレト徹底解説【スマブラSP】",
       "channel": "Alf‪α‬チャンネル",
       "published": "2022-10-06",
       "pinned": false
@@ -3185,4 +3192,4 @@ export const VIDEO_LINKS = {
     }
   ]
 };
-export const VIDEO_LINKS_FETCHED = "2026-09-30";
+export const VIDEO_LINKS_FETCHED = "2026-10-01";

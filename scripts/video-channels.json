@@ -1,2 +1,9 @@
 {
+  "ネス": [
+    {
+      "channelId": "UCGOuynp325m_r2Vgw5lnElQ",
+      "uploadsPlaylistId": "UUGOuynp325m_r2Vgw5lnElQ",
+      "note": "がくと(Gackt)本人チャンネル『マイスターG』。ZETA DIVISION所属・ネス使い。確認: ssbwiki Smasher:Gackt のYouTubeリンク、ZETA DIVISION公式 https://zetadivision.com/players/gackt のSNSリンク@Gackt_ssb。両方とも同じchannelId(UCGOuynp325m_r2Vgw5lnElQ)にAPI channels.listで一致。"
+    }
+  ]
 }

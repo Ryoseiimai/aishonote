@@ -31,7 +31,7 @@ const ALIASES = {
   "ベレト/ベレス": ["ベレト", "ベレス"],
 };
 
-function slugify(name) {
+export function slugify(name) {
   return name.replace(/[^\p{L}\p{N}]/gu, "_");
 }
 
@@ -54,8 +54,29 @@ async function apiGet(path, params, apiKey) {
   return body;
 }
 
+const NAMED_ENTITIES = {
+  "&lt;": "<",
+  "&gt;": ">",
+  "&quot;": '"',
+  "&#39;": "'",
+  "&#x27;": "'",
+};
+
+// YouTube Data API はタイトル・チャンネル名をHTMLエスケープして返すため素の文字に戻す。
+// &amp; は他の実体参照を戻した後、最後に1回だけ戻す(二重デコード防止)。
+function decodeHtmlEntities(s) {
+  let out = String(s || "");
+  for (const [entity, char] of Object.entries(NAMED_ENTITIES)) {
+    out = out.split(entity).join(char);
+  }
+  out = out.replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)));
+  out = out.replace(/&#x([0-9a-fA-F]+);/g, (_, code) => String.fromCodePoint(parseInt(code, 16)));
+  out = out.split("&amp;").join("&");
+  return out;
+}
+
 function sanitizeText(s, maxLen) {
-  return String(s || "")
+  return decodeHtmlEntities(String(s || ""))
     .replace(/[\u0000-\u001f\u007f]/g, "")
     .trim()
     .slice(0, maxLen);
@@ -70,7 +91,7 @@ function nameMatchesTitle(name, aliases, title) {
   return candidates.some((c) => c && title.includes(c));
 }
 
-async function readCache(slug) {
+export async function readCache(slug) {
   try {
     return JSON.parse(await readFile(resolve(CACHE_DIR, `${slug}.json`), "utf8"));
   } catch {
@@ -78,7 +99,7 @@ async function readCache(slug) {
   }
 }
 
-async function writeCache(slug, data) {
+export async function writeCache(slug, data) {
   await mkdir(CACHE_DIR, { recursive: true });
   await writeFile(resolve(CACHE_DIR, `${slug}.json`), JSON.stringify(data, null, 2));
 }
@@ -108,26 +129,70 @@ async function searchVideosForFighter(name, aliases, apiKey) {
   return [...matched, ...rest].slice(0, MAX_PER_FIGHTER).map((v) => ({ ...v, pinned: false }));
 }
 
-async function searchVideosInChannel(name, channelId, apiKey) {
-  const body = await apiGet("search", {
-    part: "snippet",
-    q: `${name} 解説`,
-    type: "video",
-    channelId,
-    regionCode: "JP",
-    relevanceLanguage: "ja",
-    maxResults: "5",
-  }, apiKey);
-  return (body.items || [])
+const PINNED_KEYWORDS = ["解説", "立ち回り", "コンボ", "対策", "講座"];
+const MAX_PLAYLIST_PAGES = 8;
+
+// search.list(100ユニット)を使わず、登録済み本人チャンネルの uploads プレイリストを
+// playlistItems.list(1ユニット/ページ)で新しい順にたどり、タイトルで絞り込む。
+async function fetchChannelUploads(uploadsPlaylistId, apiKey) {
+  const items = [];
+  let pageToken;
+  for (let page = 0; page < MAX_PLAYLIST_PAGES; page += 1) {
+    const params = {
+      part: "snippet,contentDetails",
+      playlistId: uploadsPlaylistId,
+      maxResults: "50",
+    };
+    if (pageToken) params.pageToken = pageToken;
+    const body = await apiGet("playlistItems", params, apiKey);
+    items.push(...(body.items || []));
+    pageToken = body.nextPageToken;
+    if (!pageToken) break;
+  }
+  return items;
+}
+
+export async function searchVideosInChannel(name, aliases, channelEntry, apiKey) {
+  const uploads = await fetchChannelUploads(channelEntry.uploadsPlaylistId, apiKey);
+  const candidates = uploads
     .map((it) => ({
-      id: it.id?.videoId,
+      id: it.snippet?.resourceId?.videoId,
       title: sanitizeText(it.snippet?.title, 120),
       channel: sanitizeText(it.snippet?.channelTitle, 80),
       published: (it.snippet?.publishedAt || "").slice(0, 10),
-      pinned: true,
     }))
     .filter((v) => v.id && isValidVideoId(v.id))
-    .slice(0, MAX_PINNED_PER_CHANNEL);
+    .filter((v) => nameMatchesTitle(name, aliases, v.title))
+    .filter((v) => PINNED_KEYWORDS.some((k) => v.title.includes(k)))
+    .filter((v) => !/#shorts/i.test(v.title))
+    .slice(0, MAX_PINNED_PER_CHANNEL * 3); // videos.listでの後段検証(60秒以下/embeddable=false除外)向けに多めに残す
+
+  if (candidates.length === 0) return [];
+
+  const details = await apiGet("videos", {
+    part: "contentDetails,status",
+    id: candidates.map((c) => c.id).join(","),
+  }, apiKey);
+  const infoById = new Map((details.items || []).map((it) => [it.id, it]));
+
+  return candidates
+    .filter((c) => {
+      const info = infoById.get(c.id);
+      if (!info) return false;
+      if (info.status?.privacyStatus !== "public") return false;
+      if (info.status?.embeddable === false) return false;
+      const seconds = parseIsoDurationSeconds(info.contentDetails?.duration);
+      return seconds > 60;
+    })
+    .slice(0, MAX_PINNED_PER_CHANNEL)
+    .map((v) => ({ ...v, pinned: true }));
+}
+
+function parseIsoDurationSeconds(iso) {
+  const m = /^PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?$/.exec(String(iso || ""));
+  if (!m) return 0;
+  const [, h, min, s] = m;
+  return (Number(h) || 0) * 3600 + (Number(min) || 0) * 60 + (Number(s) || 0);
 }
 
 export function renderVideoLinksModule(videoLinks, fetchedAt) {
@@ -146,7 +211,33 @@ export function jstDate(date = new Date()) {
   return date.toLocaleDateString("sv-SE", { timeZone: "Asia/Tokyo" });
 }
 
+// API を一切呼ばず、既存の scripts/.cache/videos/*.json だけから video-links.js を作り直す。
+// キャッシュ済みタイトル/チャンネル名も decodeHtmlEntities で再整形する(過去にエスケープ済みのまま保存されたぶんの是正)。
+async function rebuildFromCache() {
+  const videoLinks = {};
+  for (const name of SSBU_FIGHTERS) {
+    const slug = slugify(name);
+    const cached = await readCache(slug);
+    if (!cached) continue;
+    videoLinks[name] = cached.map((v) => ({
+      ...v,
+      title: sanitizeText(v.title, 120),
+      channel: sanitizeText(v.channel, 80),
+    }));
+  }
+  const fetchedAt = jstDate();
+  await writeFile(OUTPUT, renderVideoLinksModule(videoLinks, fetchedAt));
+  const withVideos = Object.values(videoLinks).filter((v) => v.length > 0).length;
+  console.log(`(from-cache) 取得済みキャラ数: ${Object.keys(videoLinks).length}/${SSBU_FIGHTERS.length}（動画あり: ${withVideos}）`);
+}
+
 async function main() {
+  const fromCache = process.argv.includes("--from-cache") || process.env.FROM_CACHE === "1";
+  if (fromCache) {
+    await rebuildFromCache();
+    return;
+  }
+
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (!apiKey) throw new Error("環境変数 YOUTUBE_API_KEY が未設定です");
 
@@ -168,8 +259,8 @@ async function main() {
     try {
       let pinned = [];
       const pinnedChannels = channels[name] || [];
-      for (const { channelId } of pinnedChannels) {
-        pinned = pinned.concat(await searchVideosInChannel(name, channelId, apiKey));
+      for (const channelEntry of pinnedChannels) {
+        pinned = pinned.concat(await searchVideosInChannel(name, ALIASES[name], channelEntry, apiKey));
         await sleep(200);
       }
       const searched = await searchVideosForFighter(name, ALIASES[name], apiKey);
