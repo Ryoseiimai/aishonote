@@ -100,10 +100,24 @@ test("reference-display: iOS版の「このアプリについて」はリンク�
   assert.equal(aboutSourceView({ isNative: true, embedOnNative: true, meta }).heading, "相性データの出典");
 });
 
-test("external-links: エクスポートは出典サイトトップとASCIIだけのプライバシーポリシーURLの2つだけ", () => {
-  assert.deepEqual(Object.keys(externalLinks).sort(), ["PRIVACY_POLICY_URL", "SHIRATSUKI_URL"]);
+test("external-links: エクスポートは出典サイト・プライバシーポリシー・解説動画用URL断片4つだけ", () => {
+  assert.deepEqual(
+    Object.keys(externalLinks).sort(),
+    [
+      "PRIVACY_POLICY_URL",
+      "SHIRATSUKI_URL",
+      "YOUTUBE_EMBED_BASE",
+      "YOUTUBE_SEARCH_BASE",
+      "YOUTUBE_THUMB_BASE",
+      "YOUTUBE_WATCH_BASE",
+    ],
+  );
   assert.equal(SHIRATSUKI_URL, "https://ssbu-shiratsuki-theory.net/");
   assert.equal(PRIVACY_POLICY_URL, "https://github.com/Ryoseiimai/aishonote/blob/main/docs/privacy.md");
   assert.match(PRIVACY_POLICY_URL, /^[\x21-\x7e]+$/, "ASCIIだけ");
   assert.ok(existsSync(new URL("../docs/privacy.md", import.meta.url)), "リンク先のファイルがリポジトリにある");
+  assert.equal(externalLinks.YOUTUBE_THUMB_BASE, "https://i.ytimg.com/vi/");
+  assert.equal(externalLinks.YOUTUBE_EMBED_BASE, "https://www.youtube-nocookie.com/embed/");
+  assert.equal(externalLinks.YOUTUBE_WATCH_BASE, "https://www.youtube.com/watch?v=");
+  assert.equal(externalLinks.YOUTUBE_SEARCH_BASE, "https://www.youtube.com/results?search_query=");
 });
