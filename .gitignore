@@ -5,3 +5,15 @@ DerivedData/
 www/
 .DS_Store
 __pycache__/
+
+# Android release artifacts
+android-build-out/
+build-out/
+*.jks
+*.keystore
+keystore.properties
+android/local.properties
+android/app/build/
+android/build/
+android/.gradle/
+android/captures/
