@@ -50,7 +50,7 @@
 - 「一般的な相性の目安」カードの末尾に、自分のキャラのYouTube解説動画を最大8件カード表示。
 - 動画は `scripts/fetch-videos.mjs`（YouTube Data API v3）で事前取得し `js/presets/video-links.js` に同梱（videoIdのみ・URLは持たない）。
 - Web版: カードを押すとその場で `youtube-nocookie.com` の埋め込みプレーヤーに差し替えて再生（押すまでiframeは作らない）。
-- iOSアプリ版: iframe埋め込みはしない（WebView内埋め込みはエラー153になりやすいため）。カードを押すとSafariでYouTubeを開く。
+- iOS・Androidアプリ版: iframe埋め込みはしない（WebView内埋め込みはエラー153になりやすいため）。カードを押すとブラウザまたはYouTubeアプリでYouTubeを開く。
 - 動画が0本のキャラは「YouTubeで探す」リンク1本のみ表示。
 - 詳細は `README.md` の「解説動画を更新する」節。
 
