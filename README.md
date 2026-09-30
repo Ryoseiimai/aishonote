@@ -48,6 +48,21 @@ Web版は同梱データ（相性表の抜粋）を読み込んで表示しま�
 未対応slugや取得失敗は警告し、取得できた分だけ生成して最後に取得数と欠落キャラを表示します。
 全件失敗した場合は既存ファイルを保持します。
 
+## 解説動画を更新する
+
+YouTube Data API v3 の鍵を環境変数 `YOUTUBE_API_KEY` に入れて
+`YOUTUBE_API_KEY=xxx node scripts/fetch-videos.mjs` を実行すると、キャラごとに
+「スマブラSP ＜キャラ名＞ 解説」で検索し、上位から最大5本（タイトルにキャラ名を含むものを優先）を
+`js/presets/video-links.js` に書き出します（動画ID・タイトル・チャンネル名・公開日のみ。URLは持ちません）。
+`scripts/video-channels.json` にキャラ名→YouTubeチャンネルIDを登録すると、そのチャンネル内の動画を
+先頭に最大3本並べます（本人確認が取れたチャンネルだけ登録する運用）。
+特定のキャラだけ更新したい場合は `ONLY=ネス,マリオ node scripts/fetch-videos.mjs` のように指定できます。
+API枠切れ（quotaExceeded）で途中終了した場合は、取得済みキャラを `scripts/.cache/videos/` にキャッシュして
+そこで停止するので、翌日以降に再実行すれば続きから取得します。
+
+Web版はキャラの解説動画カードをタップするとその場で YouTube の埋め込みプレーヤー（youtube-nocookie.com）に
+差し替えて再生します。iOSアプリ版はアプリ内埋め込みを避け、タップするとSafariでYouTubeを開きます。
+
 ## コントリビュート方法
 
 `CONTRIBUTING.md` を参照してください。バグ報告・機能要望は `.github/ISSUE_TEMPLATE/` のテンプレートを

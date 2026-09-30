@@ -94,6 +94,10 @@ jobs:
           #   - dom.js の SVG 名前空間 http://www.w3.org/2000/svg（ネットワークアクセスなし）
           #   - external-links.js の出典サイトトップ https://ssbu-shiratsuki-theory.net/ と
           #     プライバシーポリシー https://github.com/Ryoseiimai/aishonote/blob/main/docs/privacy.md
+          #   - external-links.js の解説動画用URL断片4つ(videoIdは含まない。base文字列のみ):
+          #     https://i.ytimg.com/vi/ / https://www.youtube-nocookie.com/embed/ /
+          #     https://www.youtube.com/watch?v= / https://www.youtube.com/results?search_query=
+          #   - index.html の CSP(img-src/frame-src)に書いた同じ2オリジン(ネットワークアクセスの許可設定であり、fetch等の呼び出しではない)
           #   - presets/matchup-reference.js・presets/matchup-links.js の相性表ページ https://ssbu-shiratsuki-theory.net/matchup/<slug>.html
           #   - presets/ssbu-curriculum.js の初心者向け上達カリキュラムの出典URL(sources/settings)。docs/beginner-curriculum.json と同じ固定リスト。
           #   - presets/ssbu-char-curriculum.js のキャラ別出典183 URL。調査済みbatch-1〜6の固定URLのみ（追加時は個別確認）。
@@ -102,6 +106,8 @@ jobs:
           if grep -RnoE 'https?://[^"'"'"'`[:space:]]*' js/ index.html \
             | grep -vE '^js/dom\.js:[0-9]+:http://www\.w3\.org/2000/svg$' \
             | grep -vE '^js/external-links\.js:[0-9]+:(https://ssbu-shiratsuki-theory\.net/|https://github\.com/Ryoseiimai/aishonote/blob/main/docs/privacy\.md)$' \
+            | grep -vE '^js/external-links\.js:[0-9]+:(https://i\.ytimg\.com/vi/|https://www\.youtube-nocookie\.com/embed/|https://www\.youtube\.com/watch\?v=|https://www\.youtube\.com/results\?search_query=)$' \
+            | grep -vE '^index\.html:[0-9]+:(https://i\.ytimg\.com;|https://www\.youtube-nocookie\.com;)$' \
             | grep -vE '^js/presets/matchup-(reference|links)\.js:[0-9]+:https://ssbu-shiratsuki-theory\.net/matchup/[a-z0-9_]+\.html$' \
             | grep -vE '^js/presets/ssbu-char-curriculum\.js:[0-9]+:https://game8\.jp/(smashbros-special/223431|smashbros-special/223432|smashbros-special/223433|smashbros-special/223434|smashbros-special/223435|smashbros-special/223436|smashbros-special/223437|smashbros-special/223438|smashbros-special/223439|smashbros-special/223440|smashbros-special/223441|smashbros-special/223442)$' \
             | grep -vE '^js/presets/ssbu-char-curriculum\.js:[0-9]+:https://game8\.jp/(smashbros-special/223443|smashbros-special/223444|smashbros-special/223445|smashbros-special/223446|smashbros-special/223447|smashbros-special/223448|smashbros-special/223451|smashbros-special/223452|smashbros-special/223453|smashbros-special/223454|smashbros-special/223455|smashbros-special/223456)$' \

@@ -4,6 +4,8 @@ import { MATCHUP_LINKS } from "./presets/matchup-links.js";
 import { referenceView, isNativePlatform, aboutSourceView, EMBED_REFERENCE_ON_NATIVE } from "./reference-display.js";
 import { showAlert, showConfirm } from "./dialog.js";
 import { SHIRATSUKI_URL, PRIVACY_POLICY_URL } from "./external-links.js";
+import { VIDEO_LINKS } from "./presets/video-links.js";
+import { renderVideoSection } from "./video-section.js";
 import { SSBU_CURRICULUM } from "./presets/ssbu-curriculum.js";
 import { characterMenuView } from "./char-curriculum-display.js";
 import { experience } from "./progression.js";
@@ -1031,6 +1033,7 @@ function renderReferenceCard(my, myMatches) {
       el("h2", {}, "一般的な相性の目安"),
       el("p", {}, view.texts.linkGuide),
       externalLink(view.url, view.texts.linkButton, "ref-link-btn"),
+      renderVideoSection(my, VIDEO_LINKS, IS_NATIVE),
     ]);
   }
   const myFighterStats = matchupStats(myMatches, my);
@@ -1042,6 +1045,7 @@ function renderReferenceCard(my, myMatches) {
       renderReferenceColumn("苦手な相手", "bad", ref.bad, myFighterStats),
     ]),
     el("p", { className: "ref-matchup-sources" }, [externalLink(view.url, view.texts.sourceLink)]),
+    renderVideoSection(my, VIDEO_LINKS, IS_NATIVE),
   ]);
 }
 

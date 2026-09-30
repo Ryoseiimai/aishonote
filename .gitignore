@@ -5,6 +5,7 @@ DerivedData/
 www/
 .DS_Store
 __pycache__/
+scripts/.cache/
 
 # Android release artifacts
 android-build-out/
