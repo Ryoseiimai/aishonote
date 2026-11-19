@@ -21,6 +21,10 @@ rsync -a --delete --delete-excluded \
   --exclude 'store/' \
   --exclude 'AI_Logs/' \
   --exclude 'ios/' \
+  --exclude 'android/' \
+  --exclude 'build-out/' \
+  --exclude 'android-build-out/' \
+  --exclude 'assets/' \
   --exclude 'node_modules/' \
   --exclude 'www/' \
   --exclude 'build/' \
@@ -31,6 +35,7 @@ rsync -a --delete --delete-excluded \
   --exclude 'package-lock.json' \
   --exclude 'capacitor.config.json' \
   --exclude '.gitignore' \
+  --exclude '.DS_Store' \
   --exclude '.git/' \
   ./ ./www/
 
@@ -42,4 +47,20 @@ if [ ${#REFERENCE_EXCLUDE[@]} -gt 0 ]; then
   echo "相性データ本体は同梱せず（matchup-links.js のみ）"
 fi
 
-echo "synced -> www/"
+# android/・build-out/ 等の除外漏れ検知: ビルド成果物(apk/aab/署名鍵)が紛れ込むとネイティブアプリに同梱されてしまうため。
+if find www -type f \( -name '*.apk' -o -name '*.aab' -o -name '*.jks' -o -name '*.keystore' \) | grep -q .; then
+  echo "www/ にビルド成果物/署名鍵が含まれています" >&2
+  find www -type f \( -name '*.apk' -o -name '*.aab' -o -name '*.jks' -o -name '*.keystore' \)
+  exit 1
+fi
+
+# www/ が肥大化していないかの目安チェック(通常は1MB未満)。超過時は除外漏れの調査用に上位5件を表示する。
+WWW_SIZE_KB=$(du -sk www | cut -f1)
+WWW_SIZE_LIMIT_KB=5000
+if [ "$WWW_SIZE_KB" -gt "$WWW_SIZE_LIMIT_KB" ]; then
+  echo "www/ が ${WWW_SIZE_KB}KB あります（上限 ${WWW_SIZE_LIMIT_KB}KB）。大きいファイル上位5件:" >&2
+  find www -type f -exec du -k {} + | sort -rn | head -5 >&2
+  exit 1
+fi
+
+echo "synced -> www/ (${WWW_SIZE_KB}KB)"
