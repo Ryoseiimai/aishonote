@@ -102,6 +102,7 @@ jobs:
           #   - presets/ssbu-curriculum.js の初心者向け上達カリキュラムの出典URL(sources/settings)。docs/beginner-curriculum.json と同じ固定リスト。
           #   - presets/ssbu-char-curriculum.js のキャラ別出典183 URL。調査済みbatch-1〜6の固定URLのみ（追加時は個別確認）。
           #   - presets/ssbu-fighter-profiles.js のキャラ診断用の特徴データの出典177 URL。docs/fighter-profiles.json と同じ固定リスト（node scripts/build-fighter-profiles.mjs --ci-allowlist で生成）。
+          #   - presets/sf6-fighters.js のキャラ名プリセットの出典 https://www.streetfighter.com/6/ja-jp/character （CAPCOM公式サイト）。
           # いずれも fetch/script/style/font として読み込まれることはなく、外部リンク(rel=noopener noreferrer)の宛先になるだけ。
           if grep -RnoE 'https?://[^"'"'"'`[:space:]]*' js/ index.html \
             | grep -vE '^js/dom\.js:[0-9]+:http://www\.w3\.org/2000/svg$' \
@@ -147,7 +148,8 @@ jobs:
             | grep -vE '^js/presets/ssbu-fighter-profiles\.js:[0-9]+:https://www\.nitolog\.com/(entry/smash-bros-sp/peach-feature|entry/smash-bros-sp/pikachu-feature|entry/smash-bros-sp/pikminandolimar-combo|entry/smash-bros-sp/pit-combo|entry/smash-bros-sp/pokemontrainer-feature|entry/smash-bros-sp/robot-combo|entry/smash-bros-sp/samus-feature|entry/smash-bros-sp/snake-combo|entry/smash-bros-sp/sonic-combo|entry/smash-bros-sp/wario-combo|entry/smash-bros-sp/yoshi-feature|entry/smash-bros-sp/zerosuitsamus-combo)$' \
             | grep -vE '^js/presets/ssbu-fighter-profiles\.js:[0-9]+:https://www\.ssbwiki\.com/(Dash|Greninja_\(SSBU\)|Little_Mac_\(SSBU\)|Mega_Man_\(SSBU\)|Mii_Brawler_\(SSBU\)|Mii_Gunner_\(SSBU\)|Mii_Swordfighter_\(SSBU\)|Pac-Man_\(SSBU\)|Palutena_\(SSBU\)|Robin_\(SSBU\)|Rosalina_%26_Luma_\(SSBU\)|Shulk_\(SSBU\))$' \
             | grep -vE '^js/presets/ssbu-fighter-profiles\.js:[0-9]+:https://www\.ssbwiki\.com/(Toon_Link_\(SSBU\)|Villager_\(SSBU\)|Weight|Wii_Fit_Trainer_\(SSBU\)|Wolf_\(SSBU\))$' \
-            | grep -vE '^js/presets/ssbu-curriculum\.js:[0-9]+:https://(arutora\.com/17727|altema\.jp/sumaburaswitch/hazikinyuryoku|belliro\.com/sumabura-controller-no2/|gamerch\.com/smashbros/(59596|55948)|forechan\.co\.jp/smashbros/(smashbros-beginner-roadmap/|ness/)|smashlog\.games/(15574|7866|14666)|marutarou\.com/2021/07/27/amabrogakeagarihouhouyonsyuosie/)$'; then
+            | grep -vE '^js/presets/ssbu-curriculum\.js:[0-9]+:https://(arutora\.com/17727|altema\.jp/sumaburaswitch/hazikinyuryoku|belliro\.com/sumabura-controller-no2/|gamerch\.com/smashbros/(59596|55948)|forechan\.co\.jp/smashbros/(smashbros-beginner-roadmap/|ness/)|smashlog\.games/(15574|7866|14666)|marutarou\.com/2021/07/27/amabrogakeagarihouhouyonsyuosie/)$' \
+            | grep -vE '^js/presets/sf6-fighters\.js:[0-9]+:https://www\.streetfighter\.com/6/ja-jp/character$'; then
             echo "外部URLが見つかりました。依存/CDN/フォント等の外部参照は禁止です。"
             exit 1
           fi
