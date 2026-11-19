@@ -14,6 +14,7 @@ import { QUESTIONS, DIAGNOSIS_VERSION, isCompleteAnswers } from "./diagnosis-que
 import { diagnose } from "./diagnosis.js";
 import { diagnosisEntryCard, diagnosisQuiz, diagnosisResult, diagnosisUnavailable } from "./diagnosis-view.js";
 import { gameMenuEntries, isComingSoonGame, visibleGames, selectGamePatch, nativeSafeState, makeMyFighterPatch, diagnosisViewFor, DIAGNOSIS_GAME_ID, COMING_SOON_NOTICE } from "./games.js";
+import { fighterPresetSuggestions } from "./fighter-preset-display.js";
 import { shouldShowBirthday, birthdayDismissalPatch } from "./birthday.js";
 import { showBirthday } from "./birthday-view.js";
 import { consumeGiftLink } from "./gift-link.js";
@@ -1251,6 +1252,7 @@ function renderFighterSection() {
   const myFighters = state.myFightersByGame[gameId] || [];
 
   const customSet = new Set(game.customFighters);
+  const presetSuggestions = fighterPresetSuggestions(gameId, fighters);
 
   const fighterCheckboxes = el(
     "div",
@@ -1292,6 +1294,24 @@ function renderFighterSection() {
     )
   );
 
+  const presetButtons =
+    presetSuggestions.length > 0
+      ? el("div", { className: "fighter-preset" }, [
+          el("p", { className: "fighter-preset-label" }, "キャラ名プリセットから追加"),
+          el(
+            "div",
+            { className: "fighter-preset-list" },
+            presetSuggestions.map((name) =>
+              el(
+                "button",
+                { type: "button", className: "secondary-btn", onClick: () => onAddPresetFighter(name) },
+                name
+              )
+            )
+          ),
+        ])
+      : null;
+
   const addFighterForm = el("form", { className: "inline-form", onSubmit: onAddFighter }, [
     el("input", {
       type: "text",
@@ -1315,27 +1335,37 @@ function renderFighterSection() {
       },
     }),
     fighterCheckboxes,
+    presetButtons,
     addFighterForm,
   ]);
 }
 
-function onAddFighter(e) {
-  e.preventDefault();
-  const name = newFighterNameDraft.trim();
+/** キャラ名を自キャラ設定ゲームへ追加する。検証エラーなら知らせて何もしない。 */
+function addFighterByName(name) {
   if (!isValidFighterName(name)) {
     showAlert("キャラ名は1〜50字で入力してください。");
-    return;
+    return false;
   }
   const gameId = state.activeGameId;
   const game = state.games[gameId];
   if (fightersOf(game).includes(name)) {
     showAlert("同じ名前のキャラが既にあります。");
-    return;
+    return false;
   }
   const updatedGame = { ...game, customFighters: [...game.customFighters, name] };
   const games = { ...state.games, [gameId]: updatedGame };
-  newFighterNameDraft = "";
   setState({ games });
+  return true;
+}
+
+function onAddFighter(e) {
+  e.preventDefault();
+  const name = newFighterNameDraft.trim();
+  if (addFighterByName(name)) newFighterNameDraft = "";
+}
+
+function onAddPresetFighter(name) {
+  addFighterByName(name);
 }
 
 async function onDeleteFighter(name) {
